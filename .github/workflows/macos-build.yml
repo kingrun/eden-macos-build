@@ -10,35 +10,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive  # Critical: enables nested submodules
-          fetch-depth: 0  # Fixes "Needed a single revision" errors :cite[8]
+          submodules: recursive
+          fetch-depth: 0  # Full clone history required for submodules
 
-      - name: Force-reinitialize submodules
+      - name: Reset and force submodules
         run: |
+          # Nuclear option: wipe submodule state
           git submodule deinit --all -f
+          rm -rf .git/modules
+          git config --unset-all submodule.recurse || true
+          
+          # Reinitialize from scratch
           git submodule sync --recursive
-          git submodule update --init --force --recursive
+          git submodule update --init --force --recursive --depth=1
+          
+          # Verify cubeb exists
+          ls externals/cubeb || (echo "Cubeb submodule missing!"; exit 1)
 
       - name: Install Dependencies
         run: |
           brew update
           brew install cmake qt@6 glew sdl2 libpng libzip ffmpeg pkgconfig
+          brew link qt@6 --force
 
-      - name: Setup Qt 6
+      - name: Setup Build Environment
         run: |
-          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)/lib/cmake" >> $GITHUB_ENV
           echo "PATH=$(brew --prefix qt@6)/bin:$PATH" >> $GITHUB_ENV
 
       - name: Configure Build
         run: |
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
+          cmake -B build -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Eden
         run: |
-          cd build
-          cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
+          cmake --build build --config Release --parallel $(sysctl -n hw.ncpu)
 
       - name: Package as DMG
         run: |
