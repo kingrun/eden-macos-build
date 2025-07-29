@@ -1,5 +1,4 @@
 name: Build Eden macOS
-
 on:
   push:
     branches: [macos]
@@ -9,60 +8,95 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    
     steps:
-      - uses: actions/checkout@v4
-        
-      - name: Create externals directory
-        run: mkdir -p externals
-        
-      - name: Clone cubeb
-        run: |
-          git clone https://github.com/mozilla/cubeb.git externals/cubeb
-          cd externals/cubeb
-          # Checkout a known compatible version if needed
-          # git checkout <specific-commit-or-tag>
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0  # Ensure full history for submodules
           
-      - name: Clone other dependencies
+      # Explicitly handle submodules with more aggressive approach
+      - name: Initialize and update submodules
         run: |
-          git clone https://github.com/boostorg/boost.git externals/boost
-          cd externals/boost
-          git checkout boost-1.80.0
+          git config --global --add safe.directory '*'
+          git submodule sync --recursive
+          git submodule update --init --recursive --force
           
-          git clone https://github.com/FFmpeg/FFmpeg.git externals/ffmpeg
-          cd externals/ffmpeg
-          git checkout n5.1.2
+      # Verify submodules are present
+      - name: Verify submodules
+        run: |
+          echo "Checking for cubeb submodule..."
+          if [ ! -d "externals/cubeb" ] || [ -z "$(ls -A externals/cubeb)" ]; then
+            echo "cubeb submodule missing or empty"
+            echo "Attempting manual clone..."
+            rm -rf externals/cubeb
+            git clone https://github.com/mozilla/cubeb.git externals/cubeb
+          fi
+          echo "Listing externals directory:"
+          ls -la externals/
+          echo "Checking cubeb contents:"
+          ls -la externals/cubeb/ || echo "cubeb directory not accessible"
           
       - name: Install Dependencies
         run: |
           brew update
-          brew install cmake qt@5 glew sdl2 libpng libzip ffmpeg pkgconfig
-
-      - name: Setup Qt
+          brew install cmake qt@5 glew sdl2 libpng libzip ffmpeg pkg-config
+          
+      - name: Setup Qt Environment
         run: |
           echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
-          echo "PATH=$(brew --prefix qt@5)/bin:$PATH" >> $GITHUB_ENV
-
+          echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+          echo "PKG_CONFIG_PATH=$(brew --prefix qt@5)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          
       - name: Configure Build
         run: |
-          mkdir build
+          mkdir -p build
           cd build
           cmake .. \
-            -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH \
-            -DBOOST_ROOT=externals/boost \
-            -DCMAKE_BUILD_TYPE=Release
-
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)" \
+            -DQt5_DIR="$(brew --prefix qt@5)/lib/cmake/Qt5" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
+            
       - name: Build Eden
         run: |
           cd build
           cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
-
+          
+      - name: Create App Bundle (if needed)
+        run: |
+          cd build
+          # Check if there's a specific app bundle creation step needed
+          if [ -f "eden" ] || [ -f "Eden" ]; then
+            echo "Found Eden executable"
+            ls -la
+          fi
+          
       - name: Package as DMG
         run: |
           cd build
-          cpack -G DragNDrop
-
+          # Only run cpack if CPack is configured
+          if [ -f "CPackConfig.cmake" ]; then
+            cpack -G DragNDrop
+          else
+            echo "No CPack configuration found. Creating simple archive..."
+            if [ -f "eden" ]; then
+              mkdir -p Eden.app/Contents/MacOS
+              cp eden Eden.app/Contents/MacOS/
+              tar -czf Eden-macOS.tar.gz Eden.app
+            elif [ -f "Eden" ]; then
+              mkdir -p Eden.app/Contents/MacOS
+              cp Eden Eden.app/Contents/MacOS/
+              tar -czf Eden-macOS.tar.gz Eden.app
+            fi
+          fi
+          
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Eden-macOS
-          path: build/*.dmg
+          path: |
+            build/*.dmg
+            build/*.tar.gz
+          if-no-files-found: warn
