@@ -20,23 +20,49 @@ jobs:
       - name: Initialize and update submodules
         run: |
           git config --global --add safe.directory '*'
+          git config --global protocol.file.allow always
           git submodule sync --recursive
-          git submodule update --init --recursive --force
+          git submodule update --init --recursive --force --depth=1
           
-      # Verify submodules are present
-      - name: Verify submodules
+      # Handle nested submodules explicitly
+      - name: Handle nested submodules
         run: |
-          echo "Checking for cubeb submodule..."
-          if [ ! -d "externals/cubeb" ] || [ -z "$(ls -A externals/cubeb)" ]; then
-            echo "cubeb submodule missing or empty"
-            echo "Attempting manual clone..."
+          echo "Checking and fixing all submodules..."
+          
+          # List all submodules
+          git submodule status --recursive
+          
+          # Force update all submodules again
+          git submodule foreach --recursive 'git submodule sync'
+          git submodule foreach --recursive 'git submodule update --init --force'
+          
+          # Check for specific problematic submodules and handle them
+          echo "Checking externals directory structure:"
+          ls -la externals/ || echo "externals directory not found"
+          
+          # Handle cubeb
+          if [ ! -d "externals/cubeb" ] || [ -z "$(ls -A externals/cubeb 2>/dev/null)" ]; then
+            echo "Fixing cubeb submodule..."
             rm -rf externals/cubeb
-            git clone https://github.com/mozilla/cubeb.git externals/cubeb
+            mkdir -p externals
+            git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
           fi
-          echo "Listing externals directory:"
-          ls -la externals/
-          echo "Checking cubeb contents:"
-          ls -la externals/cubeb/ || echo "cubeb directory not accessible"
+          
+          # Handle libusb nested submodule
+          if [ ! -d "externals/libusb/libusb" ] || [ -z "$(ls -A externals/libusb/libusb 2>/dev/null)" ]; then
+            echo "Fixing libusb nested submodule..."
+            if [ -d "externals/libusb" ]; then
+              cd externals/libusb
+              git submodule update --init --recursive --force
+              cd ../..
+            else
+              echo "libusb parent directory not found, checking for alternative paths..."
+              find . -name "libusb" -type d 2>/dev/null || echo "No libusb directories found"
+            fi
+          fi
+          
+          echo "Final submodule status:"
+          git submodule status --recursive
           
       - name: Install Dependencies
         run: |
