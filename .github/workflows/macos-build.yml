@@ -26,67 +26,118 @@ jobs:
           echo "Cloning main level submodules..."
           
           # cubeb
-          git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
+          if [ ! -d "externals/cubeb" ]; then
+            git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
+          fi
           
           # libusb (nested structure)
-          mkdir -p externals/libusb
-          git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
+          if [ ! -d "externals/libusb/libusb" ]; then
+            mkdir -p externals/libusb
+            git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
+          fi
           
           # Vulkan-Headers
-          git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Headers.git externals/Vulkan-Headers
+          if [ ! -d "externals/Vulkan-Headers" ]; then
+            git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Headers.git externals/Vulkan-Headers
+          fi
           
           # xbyak
-          git clone --depth=1 https://github.com/Lizzie841/xbyak.git externals/xbyak
+          if [ ! -d "externals/xbyak" ]; then
+            git clone --depth=1 https://github.com/Lizzie841/xbyak.git externals/xbyak
+          fi
           
           # opus
-          git clone --depth=1 https://github.com/xiph/opus.git externals/opus
+          if [ ! -d "externals/opus" ]; then
+            git clone --depth=1 https://github.com/xiph/opus.git externals/opus
+          fi
           
           # cpp-httplib
-          git clone --depth=1 https://github.com/yhirose/cpp-httplib.git externals/cpp-httplib
+          if [ ! -d "externals/cpp-httplib" ]; then
+            git clone --depth=1 https://github.com/yhirose/cpp-httplib.git externals/cpp-httplib
+          fi
           
           # ffmpeg (nested structure)
-          mkdir -p externals/ffmpeg
-          git clone --depth=1 https://github.com/FFmpeg/FFmpeg.git externals/ffmpeg/ffmpeg
+          if [ ! -d "externals/ffmpeg/ffmpeg" ]; then
+            mkdir -p externals/ffmpeg
+            git clone --depth=1 https://github.com/FFmpeg/FFmpeg.git externals/ffmpeg/ffmpeg
+          fi
           
           # vcpkg
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git externals/vcpkg
+          if [ ! -d "externals/vcpkg" ]; then
+            git clone --depth=1 https://github.com/microsoft/vcpkg.git externals/vcpkg
+          fi
           
           # cpp-jwt
-          git clone --depth=1 https://github.com/arun11299/cpp-jwt.git externals/cpp-jwt
+          if [ ! -d "externals/cpp-jwt" ]; then
+            git clone --depth=1 https://github.com/arun11299/cpp-jwt.git externals/cpp-jwt
+          fi
           
           # VulkanMemoryAllocator
-          git clone --depth=1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git externals/VulkanMemoryAllocator
+          if [ ! -d "externals/VulkanMemoryAllocator" ]; then
+            git clone --depth=1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git externals/VulkanMemoryAllocator
+          fi
           
           # Vulkan-Utility-Libraries
-          git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git externals/Vulkan-Utility-Libraries
+          if [ ! -d "externals/Vulkan-Utility-Libraries" ]; then
+            git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git externals/Vulkan-Utility-Libraries
+          fi
           
           # boost-headers
-          git clone --depth=1 https://github.com/boostorg/headers.git externals/boost-headers
+          if [ ! -d "externals/boost-headers" ]; then
+            git clone --depth=1 https://github.com/boostorg/headers.git externals/boost-headers
+          fi
           
           # SPIRV-Tools
-          git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git externals/SPIRV-Tools
+          if [ ! -d "externals/SPIRV-Tools" ]; then
+            git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git externals/SPIRV-Tools
+          fi
           
           echo "Setting up dynarmic and its nested submodules..."
-          # dynarmic (this needs to be cloned first for its nested structure)
-          git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic
+          # dynarmic (check if it already exists first)
+          if [ ! -d "externals/dynarmic" ]; then
+            echo "Cloning dynarmic..."
+            git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic
+          else
+            echo "dynarmic already exists, skipping clone"
+          fi
           
           # dynarmic nested submodules
           mkdir -p externals/dynarmic/externals
-          git clone --depth=1 https://github.com/catchorg/Catch2.git externals/dynarmic/externals/catch
-          git clone --depth=1 https://github.com/fmtlib/fmt.git externals/dynarmic/externals/fmt
-          git clone --depth=1 https://github.com/Lizzie841/unordered_dense.git externals/dynarmic/externals/unordered_dense
-          git clone --depth=1 https://github.com/zyantific/zycore-c.git externals/dynarmic/externals/zycore-c
-          git clone --depth=1 https://github.com/zyantific/zydis.git externals/dynarmic/externals/zydis
+          
+          echo "Cloning dynarmic dependencies..."
+          if [ ! -d "externals/dynarmic/externals/catch" ]; then
+            git clone --depth=1 https://github.com/catchorg/Catch2.git externals/dynarmic/externals/catch
+          fi
+          
+          if [ ! -d "externals/dynarmic/externals/fmt" ]; then
+            git clone --depth=1 https://github.com/fmtlib/fmt.git externals/dynarmic/externals/fmt
+          fi
+          
+          if [ ! -d "externals/dynarmic/externals/unordered_dense" ]; then
+            git clone --depth=1 https://github.com/Lizzie841/unordered_dense.git externals/dynarmic/externals/unordered_dense
+          fi
+          
+          if [ ! -d "externals/dynarmic/externals/zycore-c" ]; then
+            git clone --depth=1 https://github.com/zyantific/zycore-c.git externals/dynarmic/externals/zycore-c
+          fi
+          
+          if [ ! -d "externals/dynarmic/externals/zydis" ]; then
+            git clone --depth=1 https://github.com/zyantific/zydis.git externals/dynarmic/externals/zydis
+          fi
           
           echo "Setting up nx_tzdb nested structure..."
           # nx_tzdb nested structure
-          mkdir -p externals/nx_tzdb/tzdb_to_nx/externals/tz
-          git clone --depth=1 https://github.com/eggert/tz.git externals/nx_tzdb/tzdb_to_nx/externals/tz/tz
+          if [ ! -d "externals/nx_tzdb/tzdb_to_nx/externals/tz/tz" ]; then
+            mkdir -p externals/nx_tzdb/tzdb_to_nx/externals/tz
+            git clone --depth=1 https://github.com/eggert/tz.git externals/nx_tzdb/tzdb_to_nx/externals/tz/tz
+          fi
           
           echo "Setting up sirit nested structure..."
           # sirit nested structure
-          mkdir -p externals/sirit/externals
-          git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git externals/sirit/externals/SPIRV-Headers
+          if [ ! -d "externals/sirit/externals/SPIRV-Headers" ]; then
+            mkdir -p externals/sirit/externals
+            git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git externals/sirit/externals/SPIRV-Headers
+          fi
           
           echo "Listing final externals structure:"
           find externals -type d -maxdepth 4 | sort
