@@ -2,52 +2,46 @@ name: Build Eden macOS
 
 on:
   push:
-    branches:
-      - macos
+    branches: [macos]
   pull_request:
-    branches:
-      - macos
-  workflow_dispatch:
+    branches: [macos]
 
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history, optional
+          submodules: recursive  # Critical fix: initialize submodules
 
-      - name: Verify externals/cubeb directory
+      - name: Install Dependencies
         run: |
-          echo "Listing externals directory:"
-          ls -la externals
-          echo "Listing externals/cubeb directory:"
-          ls -la externals/cubeb
+          brew update
+          brew install cmake qt@5 glew sdl2 libpng libzip ffmpeg
 
-      - name: Install dependencies
-        run: |
-          brew install cmake glew qt@5
-
-      - name: Set up Qt
+      - name: Setup Qt
         run: |
           echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
           echo "PATH=$(brew --prefix qt@5)/bin:$PATH" >> $GITHUB_ENV
 
-      - name: Configure CMake
+      - name: Configure Build
         run: |
           mkdir build
           cd build
           cmake .. -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
 
-      - name: Build
+      - name: Build Eden
         run: |
           cd build
           cmake --build . --config Release --parallel
 
-      - name: Archive build (optional)
+      - name: Package as DMG
+        run: |
+          cd build
+          cpack -G DragNDrop
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eden-macos-build
-          path: build/*
+          name: Eden-macOS
+          path: build/*.dmg
