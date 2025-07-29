@@ -17,116 +17,136 @@ jobs:
       # Manual submodule handling - bypassing Git's submodule system
       - name: Manual submodule setup
         run: |
-          echo "Setting up submodules manually to avoid nested issues..."
+          echo "Setting up all submodules manually based on .gitmodules..."
           
           # Create externals directory
           mkdir -p externals
           
-          # Clone cubeb manually
-          echo "Cloning cubeb..."
+          # Main level submodules
+          echo "Cloning main level submodules..."
+          
+          # cubeb
           git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
           
-          # Handle libusb with the specific nested structure Eden expects
-          echo "Setting up libusb with nested structure..."
-          
-          # First create the parent libusb directory
+          # libusb (nested structure)
           mkdir -p externals/libusb
-          
-          # Clone libusb into the nested location that Eden expects
           git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
           
-          # Also create a .gitmodules-like structure to fool CMake if needed
-          echo "Creating libusb parent structure..."
-          cd externals/libusb
-          # Create any files that might be expected in the parent
-          touch README.md
-          echo "libusb submodule parent" > README.md
-          cd ../..
+          # Vulkan-Headers
+          git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Headers.git externals/Vulkan-Headers
           
-          # Clone other common dependencies that Eden might need
-          echo "Cloning other potential dependencies..."
+          # xbyak
+          git clone --depth=1 https://github.com/Lizzie841/xbyak.git externals/xbyak
           
-          # Clone dynarmic if needed
-          if [ ! -d "externals/dynarmic" ]; then
-            git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic || echo "dynarmic not needed"
-          fi
+          # opus
+          git clone --depth=1 https://github.com/xiph/opus.git externals/opus
           
-          # Clone fmt if needed  
-          if [ ! -d "externals/fmt" ]; then
-            git clone --depth=1 https://github.com/fmtlib/fmt.git externals/fmt || echo "fmt not needed"
-          fi
+          # cpp-httplib
+          git clone --depth=1 https://github.com/yhirose/cpp-httplib.git externals/cpp-httplib
           
-          # Clone spdlog if needed
-          if [ ! -d "externals/spdlog" ]; then
-            git clone --depth=1 https://github.com/gabime/spdlog.git externals/spdlog || echo "spdlog not needed"
-          fi
+          # ffmpeg (nested structure)
+          mkdir -p externals/ffmpeg
+          git clone --depth=1 https://github.com/FFmpeg/FFmpeg.git externals/ffmpeg/ffmpeg
           
-          # Clone catch2 if needed
-          if [ ! -d "externals/catch2" ]; then
-            git clone --depth=1 https://github.com/catchorg/Catch2.git externals/catch2 || echo "catch2 not needed"
-          fi
+          # vcpkg
+          git clone --depth=1 https://github.com/microsoft/vcpkg.git externals/vcpkg
           
-          # Clone discord-rpc if needed
-          if [ ! -d "externals/discord-rpc" ]; then
-            git clone --depth=1 https://github.com/discord/discord-rpc.git externals/discord-rpc || echo "discord-rpc not needed"
-          fi
+          # cpp-jwt
+          git clone --depth=1 https://github.com/arun11299/cpp-jwt.git externals/cpp-jwt
           
-          # Clone inih if needed
-          if [ ! -d "externals/inih" ]; then
-            git clone --depth=1 https://github.com/benhoyt/inih.git externals/inih || echo "inih not needed"
-          fi
+          # VulkanMemoryAllocator
+          git clone --depth=1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git externals/VulkanMemoryAllocator
           
-          # Clone openssl if needed
-          if [ ! -d "externals/openssl" ]; then
-            git clone --depth=1 https://github.com/openssl/openssl.git externals/openssl || echo "openssl not needed"
-          fi
+          # Vulkan-Utility-Libraries
+          git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git externals/Vulkan-Utility-Libraries
           
-          echo "Listing externals structure:"
-          find externals -type d -maxdepth 2 | sort
+          # boost-headers
+          git clone --depth=1 https://github.com/boostorg/headers.git externals/boost-headers
+          
+          # SPIRV-Tools
+          git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git externals/SPIRV-Tools
+          
+          echo "Setting up dynarmic and its nested submodules..."
+          # dynarmic (this needs to be cloned first for its nested structure)
+          git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic
+          
+          # dynarmic nested submodules
+          mkdir -p externals/dynarmic/externals
+          git clone --depth=1 https://github.com/catchorg/Catch2.git externals/dynarmic/externals/catch
+          git clone --depth=1 https://github.com/fmtlib/fmt.git externals/dynarmic/externals/fmt
+          git clone --depth=1 https://github.com/Lizzie841/unordered_dense.git externals/dynarmic/externals/unordered_dense
+          git clone --depth=1 https://github.com/zyantific/zycore-c.git externals/dynarmic/externals/zycore-c
+          git clone --depth=1 https://github.com/zyantific/zydis.git externals/dynarmic/externals/zydis
+          
+          echo "Setting up nx_tzdb nested structure..."
+          # nx_tzdb nested structure
+          mkdir -p externals/nx_tzdb/tzdb_to_nx/externals/tz
+          git clone --depth=1 https://github.com/eggert/tz.git externals/nx_tzdb/tzdb_to_nx/externals/tz/tz
+          
+          echo "Setting up sirit nested structure..."
+          # sirit nested structure
+          mkdir -p externals/sirit/externals
+          git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git externals/sirit/externals/SPIRV-Headers
+          
+          echo "Listing final externals structure:"
+          find externals -type d -maxdepth 4 | sort
           
       - name: Verify critical dependencies
         run: |
-          echo "Verifying critical dependencies exist..."
+          echo "Verifying all critical dependencies exist..."
           
-          # Check cubeb
-          if [ -d "externals/cubeb" ] && [ "$(ls -A externals/cubeb)" ]; then
-            echo "✓ cubeb found"
-            ls -la externals/cubeb/ | head -5
-          else
-            echo "✗ cubeb missing"
-            exit 1
-          fi
+          # List of all required submodules based on .gitmodules
+          REQUIRED_PATHS=(
+            "externals/cubeb"
+            "externals/libusb/libusb"
+            "externals/Vulkan-Headers"
+            "externals/xbyak"
+            "externals/opus"
+            "externals/cpp-httplib"
+            "externals/ffmpeg/ffmpeg"
+            "externals/vcpkg"
+            "externals/cpp-jwt"
+            "externals/VulkanMemoryAllocator"
+            "externals/Vulkan-Utility-Libraries"
+            "externals/boost-headers"
+            "externals/dynarmic/externals/catch"
+            "externals/dynarmic/externals/fmt"
+            "externals/dynarmic/externals/unordered_dense"
+            "externals/dynarmic/externals/zycore-c"
+            "externals/dynarmic/externals/zydis"
+            "externals/nx_tzdb/tzdb_to_nx/externals/tz/tz"
+            "externals/sirit/externals/SPIRV-Headers"
+            "externals/SPIRV-Tools"
+          )
           
-          # Check libusb nested structure - the exact path CMake is looking for
-          if [ -d "externals/libusb/libusb" ] && [ "$(ls -A externals/libusb/libusb)" ]; then
-            echo "✓ libusb nested structure found"
-            ls -la externals/libusb/
-            ls -la externals/libusb/libusb/ | head -5
-          else
-            echo "✗ libusb nested structure missing"
-            echo "Current externals/libusb structure:"
-            ls -la externals/libusb/ || echo "externals/libusb doesn't exist"
-            
-            # Try emergency fix - create the exact structure
-            echo "Creating emergency libusb structure..."
-            rm -rf externals/libusb
-            mkdir -p externals/libusb
-            git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
-            
-            if [ -d "externals/libusb/libusb" ] && [ "$(ls -A externals/libusb/libusb)" ]; then
-              echo "✓ Emergency libusb setup successful"
-              ls -la externals/libusb/libusb/ | head -5
+          MISSING_COUNT=0
+          
+          for path in "${REQUIRED_PATHS[@]}"; do
+            if [ -d "$path" ] && [ "$(ls -A "$path" 2>/dev/null)" ]; then
+              echo "✓ $path found"
             else
-              echo "✗ Emergency libusb setup failed"
-              # Show what we actually have
-              find externals -name "*libusb*" -type d
-              exit 1
+              echo "✗ $path missing or empty"
+              MISSING_COUNT=$((MISSING_COUNT + 1))
+              
+              # Show what actually exists in the parent directory
+              parent_dir=$(dirname "$path")
+              echo "  Contents of $parent_dir:"
+              if [ -d "$parent_dir" ]; then
+                ls -la "$parent_dir" | head -10
+              else
+                echo "  Parent directory doesn't exist"
+              fi
             fi
-          fi
+          done
           
-          # Show final structure
-          echo "Final externals structure:"
-          find externals -maxdepth 3 -type d | sort
+          if [ $MISSING_COUNT -gt 0 ]; then
+            echo "ERROR: $MISSING_COUNT required dependencies are missing"
+            echo "Final directory structure:"
+            find externals -type d | sort
+            exit 1
+          else
+            echo "SUCCESS: All required dependencies found!"
+          fi
           
       - name: Install Dependencies
         run: |
