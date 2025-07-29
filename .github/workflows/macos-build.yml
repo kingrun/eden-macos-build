@@ -11,15 +11,27 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true  # Changed from recursive to true
-          
-      # Force submodule initialization
-      - name: Initialize submodules
+        
+      - name: Create externals directory
+        run: mkdir -p externals
+        
+      - name: Clone cubeb
         run: |
-          git submodule sync --recursive
-          git submodule update --init --force --recursive
-
+          git clone https://github.com/mozilla/cubeb.git externals/cubeb
+          cd externals/cubeb
+          # Checkout a known compatible version if needed
+          # git checkout <specific-commit-or-tag>
+          
+      - name: Clone other dependencies
+        run: |
+          git clone https://github.com/boostorg/boost.git externals/boost
+          cd externals/boost
+          git checkout boost-1.80.0
+          
+          git clone https://github.com/FFmpeg/FFmpeg.git externals/ffmpeg
+          cd externals/ffmpeg
+          git checkout n5.1.2
+          
       - name: Install Dependencies
         run: |
           brew update
@@ -34,7 +46,10 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
+          cmake .. \
+            -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH \
+            -DBOOST_ROOT=externals/boost \
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Eden
         run: |
