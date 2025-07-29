@@ -10,17 +10,35 @@ jobs:
     runs-on: macos-latest
     
     steps:
-      - name: Checkout repository
+      - name: Checkout repository with submodules
         uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
+          token: ${{ github.token }}
+          
+      - name: Force submodule update
+        run: |
+          git config --global --add safe.directory '*'
+          git config --global protocol.file.allow always
+          git submodule sync --recursive
+          git submodule update --init --recursive --force --jobs 4
+          
+      - name: Verify submodules
+        run: |
+          echo "Checking submodule status..."
+          git submodule status --recursive
+          
+          # List critical paths
+          echo "Checking critical externals:"
+          ls -la externals/ || echo "externals directory missing"
+          ls -la externals/cubeb/ || echo "cubeb missing"
+          ls -la externals/libusb/ || echo "libusb parent missing"
+          ls -la externals/libusb/libusb/ || echo "libusb/libusb missing"
           
       - name: Install Dependencies
         run: |
-          # Update Homebrew
           brew update
-          
-          # Install core build dependencies
           brew install \
             cmake \
             ninja \
@@ -37,14 +55,8 @@ jobs:
             catch2 \
             boost \
             vulkan-headers \
-            molten-vk \
-            spirv-tools \
-            spirv-cross
+            molten-vk
             
-          # Try to install additional dependencies that might be needed
-          brew install libusb || echo "libusb install failed"
-          brew install cubeb || echo "cubeb install failed (might not be available)"
-          
       - name: Setup Qt Environment
         run: |
           echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)" >> $GITHUB_ENV
@@ -52,90 +64,11 @@ jobs:
           echo "PKG_CONFIG_PATH=$(brew --prefix qt@6)/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
           echo "Qt6_DIR=$(brew --prefix qt@6)/lib/cmake/Qt6" >> $GITHUB_ENV
           
-      - name: Setup additional paths
-        run: |
-          echo "VULKAN_SDK=$(brew --prefix molten-vk)" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$(brew --prefix fmt)/lib/pkgconfig:$(brew --prefix enet)/lib/pkgconfig" >> $GITHUB_ENV
-          
-      - name: Handle submodules selectively
-        run: |
-          echo "Setting up only essential submodules..."
-          
-          # Create externals directory
-          mkdir -p externals
-          
-          # Only clone the submodules that aren't available via Homebrew
-          # and are absolutely necessary
-          
-          # Clone xbyak (CPU instruction library, not in Homebrew)
-          if [ ! -d "externals/xbyak" ]; then
-            echo "Cloning xbyak..."
-            if ! git clone --depth=1 https://github.com/herumi/xbyak.git externals/xbyak; then
-              echo "Warning: xbyak clone failed, trying fork..."
-              git clone --depth=1 https://github.com/Lizzie841/xbyak.git externals/xbyak || echo "Both xbyak repos failed"
-            fi
-          fi
-          
-          # Clone cpp-httplib (HTTP library, might not be in Homebrew)
-          if [ ! -d "externals/cpp-httplib" ]; then
-            echo "Cloning cpp-httplib..."
-            git clone --depth=1 https://github.com/yhirose/cpp-httplib.git externals/cpp-httplib || echo "cpp-httplib clone failed"
-          fi
-          
-          # Clone cpp-jwt (JWT library, likely not in Homebrew)
-          if [ ! -d "externals/cpp-jwt" ]; then
-            echo "Cloning cpp-jwt..."
-            git clone --depth=1 https://github.com/arun11299/cpp-jwt.git externals/cpp-jwt || echo "cpp-jwt clone failed"
-          fi
-          
-          # Clone VulkanMemoryAllocator if not provided by molten-vk
-          if [ ! -d "externals/VulkanMemoryAllocator" ]; then
-            echo "Cloning VulkanMemoryAllocator..."
-            git clone --depth=1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git externals/VulkanMemoryAllocator || echo "VMA clone failed"
-          fi
-          
-          # Clone dynarmic only if needed (ARM emulation library)
-          if [ ! -d "externals/dynarmic" ]; then
-            echo "Cloning dynarmic..."
-            if git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic; then
-              # Only set up dynarmic submodules if main clone succeeded
-              mkdir -p externals/dynarmic/externals
-              
-              # Use system fmt instead of submodule
-              echo "Linking system fmt for dynarmic..."
-              ln -sf $(brew --prefix fmt) externals/dynarmic/externals/fmt || echo "fmt link failed"
-              
-              # Clone the dependencies that aren't available via Homebrew
-              git clone --depth=1 https://github.com/martinus/unordered_dense.git externals/dynarmic/externals/unordered_dense || echo "unordered_dense failed"
-              git clone --depth=1 https://github.com/zyantific/zycore-c.git externals/dynarmic/externals/zycore-c || echo "zycore-c failed"
-              git clone --depth=1 https://github.com/zyantific/zydis.git externals/dynarmic/externals/zydis || echo "zydis failed"
-            else
-              echo "dynarmic clone failed - continuing without it"
-            fi
-          fi
-          
       - name: Configure Build
         run: |
           mkdir -p build
           cd build
           
-          # Use system libraries where possible
-          cmake .. \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix)" \
-            -DQt6_DIR="$(brew --prefix qt@6)/lib/cmake/Qt6" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DENABLE_TESTS=OFF \
-            -DENABLE_COMPATIBILITY_TESTS=OFF \
-            -DUSE_SYSTEM_FMT=ON \
-            -DUSE_SYSTEM_CATCH2=ON \
-            -Dfmt_DIR="$(brew --prefix fmt)/lib/cmake/fmt" \
-            -DUSE_SYSTEM_ENET=ON \
-            -DUSE_SYSTEM_OPUS=ON \
-            -DUSE_SYSTEM_BOOST=ON \
-            -DVulkan_INCLUDE_DIR="$(brew --prefix vulkan-headers)/include" \
-            -DFFMPEG_ROOT="$(brew --prefix ffmpeg)" || \
           cmake .. \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -150,59 +83,25 @@ jobs:
           cd build
           ninja -j$(sysctl -n hw.ncpu)
           
-      - name: Create App Bundle
+      - name: Package executable
         run: |
           cd build
           echo "Looking for Eden executable..."
-          find . -name "*eden*" -type f -executable 2>/dev/null || echo "No eden executable found yet"
-          ls -la
+          find . -name "*eden*" -type f 2>/dev/null || echo "No eden files found"
           
-          # Try to find the main executable
-          EXECUTABLE=""
-          for name in "eden" "Eden" "src/eden" "src/Eden" "bin/eden" "bin/Eden"; do
-            if [ -f "$name" ] && [ -x "$name" ]; then
-              EXECUTABLE="$name"
-              echo "Found executable: $EXECUTABLE"
-              break
-            fi
-          done
-          
-          if [ -n "$EXECUTABLE" ]; then
-            echo "Creating simple app bundle with $EXECUTABLE"
-            mkdir -p Eden.app/Contents/MacOS
-            
-            # Copy executable
-            cp "$EXECUTABLE" Eden.app/Contents/MacOS/Eden
-            chmod +x Eden.app/Contents/MacOS/Eden
-            
-            # Use macdeployqt if available to handle dependencies
-            if command -v macdeployqt >/dev/null 2>&1; then
-              macdeployqt Eden.app -verbose=2
-            else
-              echo "macdeployqt not available"
-            fi
-            
-            echo "App bundle created successfully"
+          # Find and package the executable
+          if [ -f "eden" ]; then
+            echo "Found eden executable"
+            mkdir -p Eden-macOS
+            cp eden Eden-macOS/
+            tar -czf Eden-macOS.tar.gz Eden-macOS/
+          elif [ -f "src/eden" ]; then
+            echo "Found src/eden executable"
+            mkdir -p Eden-macOS
+            cp src/eden Eden-macOS/
+            tar -czf Eden-macOS.tar.gz Eden-macOS/
           else
-            echo "No executable found, will create archive of build directory"
-          fi
-          
-      - name: Package
-        run: |
-          cd build
-          
-          if [ -d "Eden.app" ]; then
-            # Create DMG
-            echo "Creating DMG..."
-            hdiutil create -srcfolder Eden.app -volname "Eden" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDRW temp-eden.dmg
-            hdiutil convert temp-eden.dmg -format UDZO -imagekey zlib-level=9 -o Eden-macOS.dmg
-            rm temp-eden.dmg
-            
-            # Also create a zip for fallback
-            zip -r Eden-macOS.zip Eden.app
-          else
-            # Create tar.gz of build contents
-            echo "Creating tar.gz archive..."
+            echo "Creating archive of entire build directory"
             tar -czf Eden-macOS.tar.gz *
           fi
           
@@ -210,8 +109,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Eden-macOS
-          path: |
-            build/*.dmg
-            build/*.zip
-            build/*.tar.gz
+          path: build/*.tar.gz
           if-no-files-found: warn
