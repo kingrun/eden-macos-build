@@ -18,16 +18,17 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/${{ github.repository }} .
 
-      - name: Initialize and update submodules
+      - name: Sync and initialize submodules
         run: |
-          git submodule update --init --recursive
+          git submodule sync --recursive
+          git submodule update --init --recursive --force --verbose
 
       - name: Verify submodules
         run: |
           echo "Listing externals directory:"
           ls -la externals
           echo "Listing externals/cubeb directory:"
-          ls -la externals/cubeb
+          ls -la externals/cubeb || echo "externals/cubeb not found"
 
       - name: Install dependencies
         run: |
