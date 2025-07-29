@@ -14,10 +14,21 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Full Git clone with submodules
+      - name: Clone repo
         run: |
-          git clone --recurse-submodules --depth=1 https://github.com/${{ github.repository }} .
-      
+          git clone --depth=1 https://github.com/${{ github.repository }} .
+
+      - name: Initialize and update submodules
+        run: |
+          git submodule update --init --recursive
+
+      - name: Verify submodules
+        run: |
+          echo "Listing externals directory:"
+          ls -la externals
+          echo "Listing externals/cubeb directory:"
+          ls -la externals/cubeb
+
       - name: Install dependencies
         run: |
           brew install cmake glew qt@5
