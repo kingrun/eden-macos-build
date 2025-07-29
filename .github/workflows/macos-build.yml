@@ -28,21 +28,31 @@ jobs:
           brew update
           # Core dependencies
           brew install cmake qt@6 glew sdl2 libpng libzip ffmpeg pkgconfig
-          # Additional Eden-specific dependencies
-          brew install fmt enet openal-soft cubeb
-          # Required for some external modules
+          # JSON and serialization
+          brew install nlohmann-json cereal
+          # Networking
+          brew install enet
+          # Audio
+          brew install openal-soft cubeb
+          # Graphics and rendering
           brew install vulkan-headers spirv-tools boost
+          # Utilities
+          brew install fmt lz4 zstd
+          # Additional dependencies from Eden docs
+          brew install catch2 libusb
+          # Link Qt
           brew link qt@6 --force
-          # Verify fmt installation
-          brew list fmt || (echo "fmt not installed!"; exit 1)
+          # Verify installations
+          brew list nlohmann-json fmt enet || (echo "Critical dependencies missing!"; exit 1)
 
       - name: Setup Build Environment
         run: |
           # Set paths for all dependencies
           echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)/lib/cmake:$(brew --prefix)/lib/cmake" >> $GITHUB_ENV
           echo "PATH=$(brew --prefix qt@6)/bin:$PATH" >> $GITHUB_ENV
-          # Set Vulkan path explicitly
-          echo "VULKAN_SDK=$(brew --prefix vulkan-headers)" >> $GITHUB_ENV
+          # Set explicit paths for critical dependencies
+          echo "nlohmann_json_DIR=$(brew --prefix nlohmann-json)/share/cmake/nlohmann_json" >> $GITHUB_ENV
+          echo "ENET_ROOT=$(brew --prefix enet)" >> $GITHUB_ENV
 
       - name: Configure Build
         run: |
@@ -54,7 +64,9 @@ jobs:
             -DUSE_SYSTEM_FMT=ON \
             -DUSE_SYSTEM_ENET=ON \
             -DUSE_SYSTEM_CUBEB=ON \
-            -DUSE_SYSTEM_SPIRV_HEADERS=OFF  # Prefer bundled SPIRV headers
+            -DUSE_SYSTEM_NLOHMANN_JSON=ON \
+            -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
+            -DLLVM_ROOT_DIR=$(brew --prefix llvm)  # Needed for some components
 
       - name: Build Eden
         run: |
