@@ -8,23 +8,20 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Clone Eden with submodules
+      - name: Clone official Eden with submodules
         run: |
-          # Clone directly from the source repository (not your fork)
           git clone --recursive https://git.eden-emu.dev/eden-emu/eden eden-source
-          
-          # Move into your fork directory
-          git clone https://github.com/kingrun/eden-macos-build eden-build
-          cd eden-build
-          
-          # Copy all source files from official repo
-          cp -r ../eden-source/* .
-          cp -r ../eden-source/.* . || true  # Ignore copy errors for special files
-          
-          # Preserve your GitHub Actions workflow
-          git checkout .github/workflows/*
-          
-          echo "PROJECT_DIR=$(pwd)" >> $GITHUB_ENV
+          echo "SOURCE_DIR=$(pwd)/eden-source" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$(pwd)/eden-build" >> $GITHUB_ENV
+
+      - name: Create clean build directory
+        run: |
+          mkdir eden-build
+          # Copy only source files (ignore .git directories)
+          find eden-source -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec cp -r {} eden-build/ \;
+          # Copy .github separately if needed
+          mkdir -p eden-build/.github/workflows
+          cp eden-source/.github/workflows/* eden-build/.github/workflows/ || true
 
       - name: Install Dependencies
         run: |
