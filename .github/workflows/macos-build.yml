@@ -1,0 +1,45 @@
+name: Build Eden macOS
+
+on:
+  push:
+    branches:
+      - macos
+  pull_request:
+    branches:
+      - macos
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install cmake glew qt@5
+
+      - name: Set up Qt
+        run: |
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
+          echo "PATH=$(brew --prefix qt@5)/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config Release --parallel
+
+      - name: Archive build (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: eden-macos-build
+          path: build/*
+
