@@ -4,110 +4,49 @@ on:
     branches: [macos]
   pull_request:
     branches: [macos]
-
 jobs:
   build:
     runs-on: macos-latest
-    
     steps:
-      - name: Checkout repository with submodules
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
-          token: ${{ github.token }}
-          
-      - name: Force submodule update
+          submodules: recursive  # Critical: enables nested submodules
+          fetch-depth: 0  # Fixes "Needed a single revision" errors :cite[8]
+
+      - name: Force-reinitialize submodules
         run: |
-          git config --global --add safe.directory '*'
-          git config --global protocol.file.allow always
+          git submodule deinit --all -f
           git submodule sync --recursive
-          git submodule update --init --recursive --force --jobs 4
-          
-      - name: Verify submodules
-        run: |
-          echo "Checking submodule status..."
-          git submodule status --recursive
-          
-          # List critical paths
-          echo "Checking critical externals:"
-          ls -la externals/ || echo "externals directory missing"
-          ls -la externals/cubeb/ || echo "cubeb missing"
-          ls -la externals/libusb/ || echo "libusb parent missing"
-          ls -la externals/libusb/libusb/ || echo "libusb/libusb missing"
-          
+          git submodule update --init --force --recursive
+
       - name: Install Dependencies
         run: |
           brew update
-          brew install \
-            cmake \
-            ninja \
-            pkg-config \
-            qt@6 \
-            glew \
-            sdl2 \
-            libpng \
-            libzip \
-            ffmpeg \
-            opus \
-            enet \
-            fmt \
-            catch2 \
-            boost \
-            vulkan-headers \
-            molten-vk
-            
-      - name: Setup Qt Environment
+          brew install cmake qt@6 glew sdl2 libpng libzip ffmpeg pkgconfig
+
+      - name: Setup Qt 6
         run: |
           echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)" >> $GITHUB_ENV
-          echo "$(brew --prefix qt@6)/bin" >> $GITHUB_PATH
-          echo "PKG_CONFIG_PATH=$(brew --prefix qt@6)/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
-          echo "Qt6_DIR=$(brew --prefix qt@6)/lib/cmake/Qt6" >> $GITHUB_ENV
-          
+          echo "PATH=$(brew --prefix qt@6)/bin:$PATH" >> $GITHUB_ENV
+
       - name: Configure Build
         run: |
-          mkdir -p build
+          mkdir build
           cd build
-          
-          cmake .. \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix)" \
-            -DQt6_DIR="$(brew --prefix qt@6)/lib/cmake/Qt6" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DENABLE_TESTS=OFF \
-            -DENABLE_COMPATIBILITY_TESTS=OFF
-            
+          cmake .. -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
+
       - name: Build Eden
         run: |
           cd build
-          ninja -j$(sysctl -n hw.ncpu)
-          
-      - name: Package executable
+          cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
+
+      - name: Package as DMG
         run: |
           cd build
-          echo "Looking for Eden executable..."
-          find . -name "*eden*" -type f 2>/dev/null || echo "No eden files found"
-          
-          # Find and package the executable
-          if [ -f "eden" ]; then
-            echo "Found eden executable"
-            mkdir -p Eden-macOS
-            cp eden Eden-macOS/
-            tar -czf Eden-macOS.tar.gz Eden-macOS/
-          elif [ -f "src/eden" ]; then
-            echo "Found src/eden executable"
-            mkdir -p Eden-macOS
-            cp src/eden Eden-macOS/
-            tar -czf Eden-macOS.tar.gz Eden-macOS/
-          else
-            echo "Creating archive of entire build directory"
-            tar -czf Eden-macOS.tar.gz *
-          fi
-          
+          cpack -G DragNDrop
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Eden-macOS
-          path: build/*.tar.gz
-          if-no-files-found: warn
+          path: build/*.dmg
