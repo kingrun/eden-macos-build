@@ -12,240 +12,143 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # Don't fetch submodules initially - we'll handle them manually
-        
-      # Manual submodule handling - bypassing Git's submodule system
-      - name: Manual submodule setup
+        with:
+          fetch-depth: 0
+          
+      - name: Install Dependencies
         run: |
-          echo "Setting up all submodules manually based on .gitmodules..."
+          # Update Homebrew
+          brew update
+          
+          # Install core build dependencies
+          brew install \
+            cmake \
+            ninja \
+            pkg-config \
+            qt@6 \
+            glew \
+            sdl2 \
+            libpng \
+            libzip \
+            ffmpeg \
+            opus \
+            enet \
+            fmt \
+            catch2 \
+            boost \
+            vulkan-headers \
+            molten-vk \
+            spirv-tools \
+            spirv-cross
+            
+          # Try to install additional dependencies that might be needed
+          brew install libusb || echo "libusb install failed"
+          brew install cubeb || echo "cubeb install failed (might not be available)"
+          
+      - name: Setup Qt Environment
+        run: |
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)" >> $GITHUB_ENV
+          echo "$(brew --prefix qt@6)/bin" >> $GITHUB_PATH
+          echo "PKG_CONFIG_PATH=$(brew --prefix qt@6)/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
+          echo "Qt6_DIR=$(brew --prefix qt@6)/lib/cmake/Qt6" >> $GITHUB_ENV
+          
+      - name: Setup additional paths
+        run: |
+          echo "VULKAN_SDK=$(brew --prefix molten-vk)" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$(brew --prefix fmt)/lib/pkgconfig:$(brew --prefix enet)/lib/pkgconfig" >> $GITHUB_ENV
+          
+      - name: Handle submodules selectively
+        run: |
+          echo "Setting up only essential submodules..."
           
           # Create externals directory
           mkdir -p externals
           
-          # Main level submodules
-          echo "Cloning main level submodules..."
+          # Only clone the submodules that aren't available via Homebrew
+          # and are absolutely necessary
           
-          # cubeb
-          if [ ! -d "externals/cubeb" ]; then
-            git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
-          fi
-          
-          # libusb (nested structure)
-          if [ ! -d "externals/libusb/libusb" ]; then
-            mkdir -p externals/libusb
-            git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
-          fi
-          
-          # Vulkan-Headers
-          if [ ! -d "externals/Vulkan-Headers" ]; then
-            git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Headers.git externals/Vulkan-Headers
-          fi
-          
-          # xbyak (with fallback for fork)
+          # Clone xbyak (CPU instruction library, not in Homebrew)
           if [ ! -d "externals/xbyak" ]; then
-            # Try the fork first, then fallback to original
-            if ! git clone --depth=1 https://github.com/Lizzie841/xbyak.git externals/xbyak; then
-              echo "Fork failed, trying original xbyak..."
-              git clone --depth=1 https://github.com/herumi/xbyak.git externals/xbyak || echo "Warning: xbyak clone failed"
+            echo "Cloning xbyak..."
+            if ! git clone --depth=1 https://github.com/herumi/xbyak.git externals/xbyak; then
+              echo "Warning: xbyak clone failed, trying fork..."
+              git clone --depth=1 https://github.com/Lizzie841/xbyak.git externals/xbyak || echo "Both xbyak repos failed"
             fi
           fi
           
-          # opus
-          if [ ! -d "externals/opus" ]; then
-            git clone --depth=1 https://github.com/xiph/opus.git externals/opus
-          fi
-          
-          # cpp-httplib
+          # Clone cpp-httplib (HTTP library, might not be in Homebrew)
           if [ ! -d "externals/cpp-httplib" ]; then
-            git clone --depth=1 https://github.com/yhirose/cpp-httplib.git externals/cpp-httplib
+            echo "Cloning cpp-httplib..."
+            git clone --depth=1 https://github.com/yhirose/cpp-httplib.git externals/cpp-httplib || echo "cpp-httplib clone failed"
           fi
           
-          # ffmpeg (nested structure)
-          if [ ! -d "externals/ffmpeg/ffmpeg" ]; then
-            mkdir -p externals/ffmpeg
-            git clone --depth=1 https://github.com/FFmpeg/FFmpeg.git externals/ffmpeg/ffmpeg
-          fi
-          
-          # vcpkg
-          if [ ! -d "externals/vcpkg" ]; then
-            git clone --depth=1 https://github.com/microsoft/vcpkg.git externals/vcpkg
-          fi
-          
-          # cpp-jwt
+          # Clone cpp-jwt (JWT library, likely not in Homebrew)
           if [ ! -d "externals/cpp-jwt" ]; then
-            git clone --depth=1 https://github.com/arun11299/cpp-jwt.git externals/cpp-jwt
+            echo "Cloning cpp-jwt..."
+            git clone --depth=1 https://github.com/arun11299/cpp-jwt.git externals/cpp-jwt || echo "cpp-jwt clone failed"
           fi
           
-          # VulkanMemoryAllocator
+          # Clone VulkanMemoryAllocator if not provided by molten-vk
           if [ ! -d "externals/VulkanMemoryAllocator" ]; then
-            git clone --depth=1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git externals/VulkanMemoryAllocator
+            echo "Cloning VulkanMemoryAllocator..."
+            git clone --depth=1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git externals/VulkanMemoryAllocator || echo "VMA clone failed"
           fi
           
-          # Vulkan-Utility-Libraries
-          if [ ! -d "externals/Vulkan-Utility-Libraries" ]; then
-            git clone --depth=1 https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git externals/Vulkan-Utility-Libraries
-          fi
-          
-          # boost-headers
-          if [ ! -d "externals/boost-headers" ]; then
-            git clone --depth=1 https://github.com/boostorg/headers.git externals/boost-headers
-          fi
-          
-          # SPIRV-Tools
-          if [ ! -d "externals/SPIRV-Tools" ]; then
-            git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git externals/SPIRV-Tools
-          fi
-          
-          echo "Setting up dynarmic and its nested submodules..."
-          # dynarmic (check if it already exists first)
+          # Clone dynarmic only if needed (ARM emulation library)
           if [ ! -d "externals/dynarmic" ]; then
             echo "Cloning dynarmic..."
-            # Try the main repository first, with fallback
-            if ! git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic; then
-              echo "Failed to clone dynarmic from main repo, trying alternative..."
-              # Create empty directory structure as fallback
+            if git clone --depth=1 https://github.com/merryhime/dynarmic.git externals/dynarmic; then
+              # Only set up dynarmic submodules if main clone succeeded
               mkdir -p externals/dynarmic/externals
-              echo "Warning: dynarmic clone failed, created empty structure"
-            fi
-          else
-            echo "dynarmic already exists, skipping clone"
-          fi
-          
-          # dynarmic nested submodules (with error handling)
-          mkdir -p externals/dynarmic/externals
-          
-          echo "Cloning dynarmic dependencies..."
-          if [ ! -d "externals/dynarmic/externals/catch" ]; then
-            git clone --depth=1 https://github.com/catchorg/Catch2.git externals/dynarmic/externals/catch || echo "Warning: catch2 clone failed"
-          fi
-          
-          if [ ! -d "externals/dynarmic/externals/fmt" ]; then
-            git clone --depth=1 https://github.com/fmtlib/fmt.git externals/dynarmic/externals/fmt || echo "Warning: fmt clone failed"
-          fi
-          
-          if [ ! -d "externals/dynarmic/externals/unordered_dense" ]; then
-            # Try the fork first, then fallback to original
-            if ! git clone --depth=1 https://github.com/Lizzie841/unordered_dense.git externals/dynarmic/externals/unordered_dense; then
-              echo "Fork failed, trying original unordered_dense..."
-              git clone --depth=1 https://github.com/martinus/unordered_dense.git externals/dynarmic/externals/unordered_dense || echo "Warning: unordered_dense clone failed"
-            fi
-          fi
-          
-          if [ ! -d "externals/dynarmic/externals/zycore-c" ]; then
-            git clone --depth=1 https://github.com/zyantific/zycore-c.git externals/dynarmic/externals/zycore-c || echo "Warning: zycore-c clone failed"
-          fi
-          
-          if [ ! -d "externals/dynarmic/externals/zydis" ]; then
-            git clone --depth=1 https://github.com/zyantific/zydis.git externals/dynarmic/externals/zydis || echo "Warning: zydis clone failed"
-          fi
-          
-          echo "Setting up nx_tzdb nested structure..."
-          # nx_tzdb nested structure
-          if [ ! -d "externals/nx_tzdb/tzdb_to_nx/externals/tz/tz" ]; then
-            mkdir -p externals/nx_tzdb/tzdb_to_nx/externals/tz
-            git clone --depth=1 https://github.com/eggert/tz.git externals/nx_tzdb/tzdb_to_nx/externals/tz/tz
-          fi
-          
-          echo "Setting up sirit nested structure..."
-          # sirit nested structure
-          if [ ! -d "externals/sirit/externals/SPIRV-Headers" ]; then
-            mkdir -p externals/sirit/externals
-            git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git externals/sirit/externals/SPIRV-Headers
-          fi
-          
-          echo "Listing final externals structure:"
-          find externals -type d -maxdepth 4 | sort
-          
-      - name: Verify critical dependencies
-        run: |
-          echo "Verifying all critical dependencies exist..."
-          
-          # List of all required submodules based on .gitmodules
-          REQUIRED_PATHS=(
-            "externals/cubeb"
-            "externals/libusb/libusb"
-            "externals/Vulkan-Headers"
-            "externals/xbyak"
-            "externals/opus"
-            "externals/cpp-httplib"
-            "externals/ffmpeg/ffmpeg"
-            "externals/vcpkg"
-            "externals/cpp-jwt"
-            "externals/VulkanMemoryAllocator"
-            "externals/Vulkan-Utility-Libraries"
-            "externals/boost-headers"
-            "externals/SPIRV-Tools"
-          )
-          
-          # Optional paths (dynarmic and nested dependencies)
-          OPTIONAL_PATHS=(
-            "externals/dynarmic/externals/catch"
-            "externals/dynarmic/externals/fmt"
-            "externals/dynarmic/externals/unordered_dense"
-            "externals/dynarmic/externals/zycore-c"
-            "externals/dynarmic/externals/zydis"
-            "externals/nx_tzdb/tzdb_to_nx/externals/tz/tz"
-            "externals/sirit/externals/SPIRV-Headers"
-          )
-          
-          MISSING_COUNT=0
-          
-          echo "Checking required dependencies:"
-          for path in "${REQUIRED_PATHS[@]}"; do
-            if [ -d "$path" ] && [ "$(ls -A "$path" 2>/dev/null)" ]; then
-              echo "✓ $path found"
+              
+              # Use system fmt instead of submodule
+              echo "Linking system fmt for dynarmic..."
+              ln -sf $(brew --prefix fmt) externals/dynarmic/externals/fmt || echo "fmt link failed"
+              
+              # Clone the dependencies that aren't available via Homebrew
+              git clone --depth=1 https://github.com/martinus/unordered_dense.git externals/dynarmic/externals/unordered_dense || echo "unordered_dense failed"
+              git clone --depth=1 https://github.com/zyantific/zycore-c.git externals/dynarmic/externals/zycore-c || echo "zycore-c failed"
+              git clone --depth=1 https://github.com/zyantific/zydis.git externals/dynarmic/externals/zydis || echo "zydis failed"
             else
-              echo "✗ $path missing or empty"
-              MISSING_COUNT=$((MISSING_COUNT + 1))
+              echo "dynarmic clone failed - continuing without it"
             fi
-          done
-          
-          echo "Checking optional dependencies:"
-          for path in "${OPTIONAL_PATHS[@]}"; do
-            if [ -d "$path" ] && [ "$(ls -A "$path" 2>/dev/null)" ]; then
-              echo "✓ $path found"
-            else
-              echo "~ $path missing (optional)"
-            fi
-          done
-          
-          if [ $MISSING_COUNT -gt 0 ]; then
-            echo "ERROR: $MISSING_COUNT required dependencies are missing"
-            echo "Final directory structure:"
-            find externals -type d | sort
-            echo "Continuing build anyway - some dependencies might be optional..."
-            # Don't exit - let CMake decide what's actually required
-          else
-            echo "SUCCESS: All required dependencies found!"
           fi
-          
-      - name: Install Dependencies
-        run: |
-          brew update
-          brew install cmake qt@5 glew sdl2 libpng libzip ffmpeg pkg-config
-          
-      - name: Setup Qt Environment
-        run: |
-          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
-          echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
-          echo "PKG_CONFIG_PATH=$(brew --prefix qt@5)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
           
       - name: Configure Build
         run: |
           mkdir -p build
           cd build
+          
+          # Use system libraries where possible
           cmake .. \
+            -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@5)" \
-            -DQt5_DIR="$(brew --prefix qt@5)/lib/cmake/Qt5" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix)" \
+            -DQt6_DIR="$(brew --prefix qt@6)/lib/cmake/Qt6" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_COMPATIBILITY_TESTS=OFF \
+            -DUSE_SYSTEM_FMT=ON \
+            -DUSE_SYSTEM_CATCH2=ON \
+            -Dfmt_DIR="$(brew --prefix fmt)/lib/cmake/fmt" \
+            -DUSE_SYSTEM_ENET=ON \
+            -DUSE_SYSTEM_OPUS=ON \
+            -DUSE_SYSTEM_BOOST=ON \
+            -DVulkan_INCLUDE_DIR="$(brew --prefix vulkan-headers)/include" \
+            -DFFMPEG_ROOT="$(brew --prefix ffmpeg)" || \
+          cmake .. \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix)" \
+            -DQt6_DIR="$(brew --prefix qt@6)/lib/cmake/Qt6" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DENABLE_TESTS=OFF \
             -DENABLE_COMPATIBILITY_TESTS=OFF
             
       - name: Build Eden
         run: |
           cd build
-          cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
+          ninja -j$(sysctl -n hw.ncpu)
           
       - name: Create App Bundle
         run: |
@@ -255,53 +158,69 @@ jobs:
           ls -la
           
           # Try to find the main executable
-          if [ -f "eden" ]; then
-            echo "Found eden executable"
-            EXECUTABLE="eden"
-          elif [ -f "Eden" ]; then
-            echo "Found Eden executable"
-            EXECUTABLE="Eden"
-          elif [ -f "src/eden" ]; then
-            echo "Found src/eden executable"
-            EXECUTABLE="src/eden"
-          elif [ -f "src/Eden" ]; then
-            echo "Found src/Eden executable"
-            EXECUTABLE="src/Eden"
-          else
-            echo "Searching for any executable..."
-            find . -type f -executable -name "*eden*" || echo "No eden executable found"
-            EXECUTABLE=""
-          fi
+          EXECUTABLE=""
+          for name in "eden" "Eden" "src/eden" "src/Eden" "bin/eden" "bin/Eden"; do
+            if [ -f "$name" ] && [ -x "$name" ]; then
+              EXECUTABLE="$name"
+              echo "Found executable: $EXECUTABLE"
+              break
+            fi
+          done
           
           if [ -n "$EXECUTABLE" ]; then
             echo "Creating app bundle with $EXECUTABLE"
             mkdir -p Eden.app/Contents/MacOS
             mkdir -p Eden.app/Contents/Resources
+            mkdir -p Eden.app/Contents/Frameworks
             
             # Copy executable
             cp "$EXECUTABLE" Eden.app/Contents/MacOS/Eden
+            chmod +x Eden.app/Contents/MacOS/Eden
+            
+            # Copy Qt frameworks and other dependencies
+            echo "Copying Qt and other dependencies..."
+            
+            # Use macdeployqt if available
+            if command -v macdeployqt >/dev/null 2>&1; then
+              macdeployqt Eden.app -verbose=2
+            else
+              echo "macdeployqt not available, manual dependency copying needed"
+              # Copy essential Qt libraries manually
+              QT_LIB_PATH="$(brew --prefix qt@6)/lib"
+              if [ -d "$QT_LIB_PATH" ]; then
+                cp -R "$QT_LIB_PATH/QtCore.framework" Eden.app/Contents/Frameworks/ 2>/dev/null || echo "QtCore copy failed"
+                cp -R "$QT_LIB_PATH/QtGui.framework" Eden.app/Contents/Frameworks/ 2>/dev/null || echo "QtGui copy failed"
+                cp -R "$QT_LIB_PATH/QtWidgets.framework" Eden.app/Contents/Frameworks/ 2>/dev/null || echo "QtWidgets copy failed"
+              fi
+            fi
             
             # Create Info.plist
-            cat > Eden.app/Contents/Info.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>Eden</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.eden.emulator</string>
-              <key>CFBundleName</key>
-              <string>Eden</string>
-              <key>CFBundleVersion</key>
-              <string>1.0</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-          </dict>
-          </plist>
-          EOF
+            cat > Eden.app/Contents/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Eden</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.eden.emulator</string>
+    <key>CFBundleName</key>
+    <string>Eden</string>
+    <key>CFBundleDisplayName</key>
+    <string>Eden</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>eden.icns</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+</dict>
+</plist>
+EOF
             
             echo "App bundle created successfully"
           else
@@ -313,11 +232,14 @@ jobs:
           cd build
           
           if [ -d "Eden.app" ]; then
-            # Create DMG if we have an app bundle
+            # Create DMG
             echo "Creating DMG..."
             hdiutil create -srcfolder Eden.app -volname "Eden" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDRW temp-eden.dmg
             hdiutil convert temp-eden.dmg -format UDZO -imagekey zlib-level=9 -o Eden-macOS.dmg
             rm temp-eden.dmg
+            
+            # Also create a zip for fallback
+            zip -r Eden-macOS.zip Eden.app
           else
             # Create tar.gz of build contents
             echo "Creating tar.gz archive..."
@@ -330,5 +252,6 @@ jobs:
           name: Eden-macOS
           path: |
             build/*.dmg
+            build/*.zip
             build/*.tar.gz
           if-no-files-found: warn
