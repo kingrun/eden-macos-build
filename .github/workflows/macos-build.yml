@@ -21,45 +21,35 @@ jobs:
           mkdir -p eden-build/.github/workflows
           cp eden-source/.github/workflows/* eden-build/.github/workflows/ || true
 
+      - name: Initialize critical submodules
+        run: |
+          cd eden-source
+          git submodule update --init -- externals/nx_tzdb
+          git submodule update --init -- externals/ffmpeg
+          cp -r externals/nx_tzdb ../eden-build/externals/nx_tzdb
+          cp -r externals/ffmpeg ../eden-build/externals/ffmpeg
+
       - name: Install Build Dependencies
         run: |
           brew update
-          # Core dependencies
           brew install cmake qt@6 glew sdl2 libpng libzip ffmpeg pkgconfig
-          # JSON and serialization
           brew install nlohmann-json cereal
-          # Networking
-          brew install enet
-          # Audio
-          brew install openal-soft cubeb
-          # Graphics and rendering
+          brew install enet openal-soft cubeb
           brew install vulkan-headers spirv-tools boost
-          # Utilities
           brew install fmt lz4 zstd
-          # Additional dependencies
           brew install catch2 libusb
-          # FFmpeg build tools
           brew install autoconf automake libtool nasm
-          # Link Qt
           brew link qt@6 --force
-          # Verify critical installations
-          brew list autoconf automake nlohmann-json fmt || (echo "Critical dependencies missing!"; exit 1)
 
       - name: Setup Build Environment
         run: |
-          # Set paths for all dependencies
           echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)/lib/cmake:$(brew --prefix)/lib/cmake" >> $GITHUB_ENV
-          echo "PATH=$(brew --prefix qt@6)/bin:$PATH" >> $GITHUB_ENV
-          # Set explicit paths for critical dependencies
+          echo "PATH=$(brew --prefix qt@6)/bin:$(brew --prefix autoconf)/bin:$(brew --prefix automake)/bin:$(brew --prefix libtool)/bin:$PATH" >> $GITHUB_ENV
           echo "nlohmann_json_DIR=$(brew --prefix nlohmann-json)/share/cmake/nlohmann_json" >> $GITHUB_ENV
-          echo "ENET_ROOT=$(brew --prefix enet)" >> $GITHUB_ENV
-          # Add autoconf to PATH
-          echo "PATH=$(brew --prefix autoconf)/bin:$(brew --prefix automake)/bin:$(brew --prefix libtool)/bin:$PATH" >> $GITHUB_ENV
 
       - name: Configure Build
         run: |
           cd $PROJECT_DIR
-          # Add necessary CMake options
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
             -DCMAKE_BUILD_TYPE=Release \
@@ -68,7 +58,7 @@ jobs:
             -DUSE_SYSTEM_CUBEB=ON \
             -DUSE_SYSTEM_NLOHMANN_JSON=ON \
             -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
-            -DLLVM_ROOT_DIR=$(brew --prefix llvm) \
+            -DENABLE_TZDB=OFF \
             -DEDEN_FFMPEG_BUILD_TYPE=Release
 
       - name: Build Eden
