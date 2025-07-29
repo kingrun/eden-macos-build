@@ -14,10 +14,14 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout code (with submodules)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 0  # Ensure full history
+          submodules: false  # We'll handle them manually
+
+      - name: Initialize submodules
+        run: git submodule update --init --recursive
 
       - name: Install dependencies
         run: |
