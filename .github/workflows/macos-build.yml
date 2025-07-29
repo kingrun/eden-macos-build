@@ -8,23 +8,23 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Checkout repository
+      - name: Clone Eden with submodules
         run: |
-          git clone --recursive --depth=1 https://github.com/kingrun/eden-macos-build eden-build
+          # Clone directly from the source repository (not your fork)
+          git clone --recursive https://git.eden-emu.dev/eden-emu/eden eden-source
+          
+          # Move into your fork directory
+          git clone https://github.com/kingrun/eden-macos-build eden-build
           cd eden-build
+          
+          # Copy all source files from official repo
+          cp -r ../eden-source/* .
+          cp -r ../eden-source/.* . || true  # Ignore copy errors for special files
+          
+          # Preserve your GitHub Actions workflow
+          git checkout .github/workflows/*
+          
           echo "PROJECT_DIR=$(pwd)" >> $GITHUB_ENV
-          
-      - name: Manual submodule initialization
-        run: |
-          cd $PROJECT_DIR
-          # Create externals directory if missing
-          mkdir -p externals
-          
-          # Clone cubeb directly into externals
-          git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
-          
-          # Verify we have the required files
-          ls externals/cubeb/CMakeLists.txt || (echo "Cubeb not properly cloned!"; exit 1)
 
       - name: Install Dependencies
         run: |
