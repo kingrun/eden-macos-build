@@ -14,21 +14,24 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Clone repo
+      - name: Clone repo (full, macos branch)
         run: |
-          git clone --depth=1 https://github.com/${{ github.repository }} .
-
-      - name: Sync and initialize submodules
+          git clone --branch macos --depth=1 https://github.com/${{ github.repository }} .
+      
+      - name: Initialize and update submodules (recursive, force)
         run: |
           git submodule sync --recursive
           git submodule update --init --recursive --force --verbose
 
-      - name: Verify submodules
+      - name: Verify cubeb submodule exists
         run: |
-          echo "Listing externals directory:"
-          ls -la externals
-          echo "Listing externals/cubeb directory:"
-          ls -la externals/cubeb || echo "externals/cubeb not found"
+          if [ ! -d "externals/cubeb" ]; then
+            echo "ERROR: externals/cubeb submodule folder NOT FOUND!"
+            exit 1
+          else
+            echo "externals/cubeb submodule found"
+            ls -la externals/cubeb
+          fi
 
       - name: Install dependencies
         run: |
