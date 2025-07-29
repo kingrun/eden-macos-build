@@ -14,15 +14,10 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Ensure full history
-          submodules: false  # We'll handle them manually
-
-      - name: Initialize submodules
-        run: git submodule update --init --recursive
-
+      - name: Full Git clone with submodules
+        run: |
+          git clone --recurse-submodules --depth=1 https://github.com/${{ github.repository }} .
+      
       - name: Install dependencies
         run: |
           brew install cmake glew qt@5
