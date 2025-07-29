@@ -8,24 +8,23 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0  # Full clone history required for submodules
-
-      - name: Reset and force submodules
+      - name: Checkout repository
         run: |
-          # Nuclear option: wipe submodule state
-          git submodule deinit --all -f
-          rm -rf .git/modules
-          git config --unset-all submodule.recurse || true
+          git clone --recursive --depth=1 https://github.com/kingrun/eden-macos-build eden-build
+          cd eden-build
+          echo "PROJECT_DIR=$(pwd)" >> $GITHUB_ENV
           
-          # Reinitialize from scratch
-          git submodule sync --recursive
-          git submodule update --init --force --recursive --depth=1
+      - name: Manual submodule initialization
+        run: |
+          cd $PROJECT_DIR
+          # Create externals directory if missing
+          mkdir -p externals
           
-          # Verify cubeb exists
-          ls externals/cubeb || (echo "Cubeb submodule missing!"; exit 1)
+          # Clone cubeb directly into externals
+          git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
+          
+          # Verify we have the required files
+          ls externals/cubeb/CMakeLists.txt || (echo "Cubeb not properly cloned!"; exit 1)
 
       - name: Install Dependencies
         run: |
@@ -40,19 +39,21 @@ jobs:
 
       - name: Configure Build
         run: |
+          cd $PROJECT_DIR
           cmake -B build -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Eden
         run: |
+          cd $PROJECT_DIR
           cmake --build build --config Release --parallel $(sysctl -n hw.ncpu)
 
       - name: Package as DMG
         run: |
-          cd build
+          cd $PROJECT_DIR/build
           cpack -G DragNDrop
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Eden-macOS
-          path: build/*.dmg
+          path: $PROJECT_DIR/build/*.dmg
