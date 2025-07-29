@@ -168,63 +168,23 @@ jobs:
           done
           
           if [ -n "$EXECUTABLE" ]; then
-            echo "Creating app bundle with $EXECUTABLE"
+            echo "Creating simple app bundle with $EXECUTABLE"
             mkdir -p Eden.app/Contents/MacOS
-            mkdir -p Eden.app/Contents/Resources
-            mkdir -p Eden.app/Contents/Frameworks
             
             # Copy executable
             cp "$EXECUTABLE" Eden.app/Contents/MacOS/Eden
             chmod +x Eden.app/Contents/MacOS/Eden
             
-            # Copy Qt frameworks and other dependencies
-            echo "Copying Qt and other dependencies..."
-            
-            # Use macdeployqt if available
+            # Use macdeployqt if available to handle dependencies
             if command -v macdeployqt >/dev/null 2>&1; then
               macdeployqt Eden.app -verbose=2
             else
-              echo "macdeployqt not available, manual dependency copying needed"
-              # Copy essential Qt libraries manually
-              QT_LIB_PATH="$(brew --prefix qt@6)/lib"
-              if [ -d "$QT_LIB_PATH" ]; then
-                cp -R "$QT_LIB_PATH/QtCore.framework" Eden.app/Contents/Frameworks/ 2>/dev/null || echo "QtCore copy failed"
-                cp -R "$QT_LIB_PATH/QtGui.framework" Eden.app/Contents/Frameworks/ 2>/dev/null || echo "QtGui copy failed"
-                cp -R "$QT_LIB_PATH/QtWidgets.framework" Eden.app/Contents/Frameworks/ 2>/dev/null || echo "QtWidgets copy failed"
-              fi
+              echo "macdeployqt not available"
             fi
-            
-            # Create Info.plist
-            cat > Eden.app/Contents/Info.plist << 'PLIST_END'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>Eden</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.eden.emulator</string>
-    <key>CFBundleName</key>
-    <string>Eden</string>
-    <key>CFBundleDisplayName</key>
-    <string>Eden</string>
-    <key>CFBundleVersion</key>
-    <string>1.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleIconFile</key>
-    <string>eden.icns</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>11.0</string>
-</dict>
-</plist>
-PLIST_END
             
             echo "App bundle created successfully"
           else
-            echo "No executable found, creating archive of build directory"
+            echo "No executable found, will create archive of build directory"
           fi
           
       - name: Package
