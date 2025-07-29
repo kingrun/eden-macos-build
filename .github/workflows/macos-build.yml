@@ -26,14 +26,22 @@ jobs:
           echo "Cloning cubeb..."
           git clone --depth=1 https://github.com/mozilla/cubeb.git externals/cubeb
           
-          # Clone libusb manually
-          echo "Cloning libusb..."
-          git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb
+          # Handle libusb with the specific nested structure Eden expects
+          echo "Setting up libusb with nested structure..."
           
-          # Create the nested libusb structure that Eden expects
-          mkdir -p externals/libusb/libusb
-          # Copy contents from the cloned libusb to the nested structure
-          cp -r externals/libusb/* externals/libusb/libusb/ || true
+          # First create the parent libusb directory
+          mkdir -p externals/libusb
+          
+          # Clone libusb into the nested location that Eden expects
+          git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
+          
+          # Also create a .gitmodules-like structure to fool CMake if needed
+          echo "Creating libusb parent structure..."
+          cd externals/libusb
+          # Create any files that might be expected in the parent
+          touch README.md
+          echo "libusb submodule parent" > README.md
+          cd ../..
           
           # Clone other common dependencies that Eden might need
           echo "Cloning other potential dependencies..."
@@ -83,30 +91,42 @@ jobs:
           # Check cubeb
           if [ -d "externals/cubeb" ] && [ "$(ls -A externals/cubeb)" ]; then
             echo "✓ cubeb found"
+            ls -la externals/cubeb/ | head -5
           else
             echo "✗ cubeb missing"
             exit 1
           fi
           
-          # Check libusb nested structure
+          # Check libusb nested structure - the exact path CMake is looking for
           if [ -d "externals/libusb/libusb" ] && [ "$(ls -A externals/libusb/libusb)" ]; then
             echo "✓ libusb nested structure found"
+            ls -la externals/libusb/
+            ls -la externals/libusb/libusb/ | head -5
           else
             echo "✗ libusb nested structure missing"
-            # Try alternative approach
-            echo "Trying alternative libusb setup..."
-            mkdir -p externals/libusb/libusb
-            git clone --depth=1 https://github.com/libusb/libusb.git temp_libusb
-            cp -r temp_libusb/* externals/libusb/libusb/
-            rm -rf temp_libusb
+            echo "Current externals/libusb structure:"
+            ls -la externals/libusb/ || echo "externals/libusb doesn't exist"
+            
+            # Try emergency fix - create the exact structure
+            echo "Creating emergency libusb structure..."
+            rm -rf externals/libusb
+            mkdir -p externals/libusb
+            git clone --depth=1 https://github.com/libusb/libusb.git externals/libusb/libusb
             
             if [ -d "externals/libusb/libusb" ] && [ "$(ls -A externals/libusb/libusb)" ]; then
-              echo "✓ libusb alternative setup successful"
+              echo "✓ Emergency libusb setup successful"
+              ls -la externals/libusb/libusb/ | head -5
             else
-              echo "✗ libusb setup failed completely"
+              echo "✗ Emergency libusb setup failed"
+              # Show what we actually have
+              find externals -name "*libusb*" -type d
               exit 1
             fi
           fi
+          
+          # Show final structure
+          echo "Final externals structure:"
+          find externals -maxdepth 3 -type d | sort
           
       - name: Install Dependencies
         run: |
