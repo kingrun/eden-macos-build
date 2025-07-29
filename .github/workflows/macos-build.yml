@@ -12,12 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive  # Critical fix: initialize submodules
+          submodules: true  # Changed from recursive to true
+          
+      # Force submodule initialization
+      - name: Initialize submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
 
       - name: Install Dependencies
         run: |
           brew update
-          brew install cmake qt@5 glew sdl2 libpng libzip ffmpeg
+          brew install cmake qt@5 glew sdl2 libpng libzip ffmpeg pkgconfig
 
       - name: Setup Qt
         run: |
@@ -33,7 +39,7 @@ jobs:
       - name: Build Eden
         run: |
           cd build
-          cmake --build . --config Release --parallel
+          cmake --build . --config Release --parallel $(sysctl -n hw.ncpu)
 
       - name: Package as DMG
         run: |
