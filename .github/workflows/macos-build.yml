@@ -25,8 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         brew update
-        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb catch2 cpp-httplib molten-vk vulkan-loader boost
-        brew install autoconf automake libtool pkg-config
+        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb molten-vk vulkan-loader boost
         brew link --overwrite qt
         
         mkdir -p ${{ github.workspace }}/stb/include
@@ -67,53 +66,41 @@ jobs:
         cd eden-source
         cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
 
-    - name: Prepare application bundle
+    # Fixed section starts here
+    - name: Rename application bundle
       run: |
         cd eden-source/build/bin
+        # Rename main application bundle
+        mv eden.app Eden.app
         
-        # Create proper app structure
-        mkdir -p Eden.app/Contents/MacOS
-        mkdir -p Eden.app/Contents/Resources
-        mkdir -p Eden.app/Contents/Frameworks
-        
-        # Move executable to correct location
-        mv yuzu Eden.app/Contents/MacOS/Eden
-        
-        # Create Info.plist using echo commands
-        echo '<?xml version="1.0" encoding="UTF-8"?>' > Eden.app/Contents/Info.plist
-        echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> Eden.app/Contents/Info.plist
-        echo '<plist version="1.0">' >> Eden.app/Contents/Info.plist
-        echo '<dict>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleExecutable</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleIdentifier</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>dev.eden-emu.Eden</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleName</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundlePackageType</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>APPL</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleShortVersionString</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>1.0.0</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleVersion</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>1</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>NSHighResolutionCapable</key>' >> Eden.app/Contents/Info.plist
-        echo '    <true/>' >> Eden.app/Contents/Info.plist
-        echo '    <key>LSMinimumSystemVersion</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>11.0</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>NSSupportsAutomaticGraphicsSwitching</key>' >> Eden.app/Contents/Info.plist
-        echo '    <true/>' >> Eden.app/Contents/Info.plist
-        echo '</dict>' >> Eden.app/Contents/Info.plist
-        echo '</plist>' >> Eden.app/Contents/Info.plist
+        # Rename executable inside bundle
+        mv Eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
+
+    - name: Update Info.plist
+      run: |
+        cd eden-source/build/bin
+        # Update executable name in Info.plist
+        plutil -replace CFBundleExecutable -string "Eden" Eden.app/Contents/Info.plist
+        # Ensure bundle identifier is correct
+        plutil -replace CFBundleIdentifier -string "dev.eden-emu.Eden" Eden.app/Contents/Info.plist
+        # Set minimum OS version
+        plutil -replace LSMinimumSystemVersion -string "11.0" Eden.app/Contents/Info.plist
 
     - name: Deploy Qt frameworks
       run: |
         cd eden-source/build/bin
         /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
+        # Clean up unnecessary rpaths
         find Eden.app -name "*.dylib" -exec install_name_tool -delete_rpath /opt/homebrew/lib {} \;
 
     - name: Sign application
       run: |
         cd eden-source/build/bin
+        # Create temporary certificate for ad-hoc signing
+        security create-keychain -p actions build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p actions build.keychain
+        # Required for notarization compatibility
         codesign --force --deep --sign - --timestamp --options=runtime Eden.app
 
     - name: Create DMG
@@ -122,17 +109,16 @@ jobs:
         mkdir -p ${{ github.workspace }}/artifact
         cd eden-source/build/bin
         
-        # Check if assets exist, use defaults if not
+        # Use bundled assets if available
+        VOLICON=""
+        BACKGROUND=""
+        
         if [ -f "${{ github.workspace }}/eden-source/distribution/macosx/eden.icns" ]; then
           VOLICON="--volicon ${{ github.workspace }}/eden-source/distribution/macosx/eden.icns"
-        else
-          VOLICON=""
         fi
         
         if [ -f "${{ github.workspace }}/eden-source/distribution/macosx/background.png" ]; then
           BACKGROUND="--background ${{ github.workspace }}/eden-source/distribution/macosx/background.png"
-        else
-          BACKGROUND=""
         fi
         
         create-dmg \
