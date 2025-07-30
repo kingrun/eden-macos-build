@@ -60,7 +60,8 @@ jobs:
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF \
-          -DCMAKE_FIND_FRAMEWORK=LAST
+          -DCMAKE_FIND_FRAMEWORK=LAST \
+          -DCMAKE_MACOSX_RPATH=ON
 
     - name: Build Eden
       run: |
@@ -79,22 +80,48 @@ jobs:
         plutil -replace CFBundleExecutable -string "Eden" Eden.app/Contents/Info.plist
         plutil -replace CFBundleIdentifier -string "dev.eden-emu.Eden" Eden.app/Contents/Info.plist
         plutil -replace LSMinimumSystemVersion -string "11.0" Eden.app/Contents/Info.plist
+        plutil -replace NSPrincipalClass -string NSApplication Eden.app/Contents/Info.plist
 
     - name: Deploy Qt frameworks
       run: |
         cd eden-source/build/bin
-        /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
         
-        # Add missing Vulkan framework
+        # First run macdeployqt without signing
+        /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite -no-strip -no-plugins -no-codesign
+        
+        # Add required libraries
         mkdir -p Eden.app/Contents/Frameworks
         cp /opt/homebrew/lib/libvulkan.1.dylib Eden.app/Contents/Frameworks/
+        cp /opt/homebrew/lib/libMoltenVK.dylib Eden.app/Contents/Frameworks/
+        cp /opt/homebrew/lib/libcubeb.1.dylib Eden.app/Contents/Frameworks/
+        
+        # Fix library paths
         install_name_tool -id @rpath/libvulkan.1.dylib Eden.app/Contents/Frameworks/libvulkan.1.dylib
+        install_name_tool -id @rpath/libMoltenVK.dylib Eden.app/Contents/Frameworks/libMoltenVK.dylib
+        install_name_tool -id @rpath/libcubeb.1.dylib Eden.app/Contents/Frameworks/libcubeb.1.dylib
+        
+        # Update executable to use RPATH
+        install_name_tool -add_rpath @executable_path/../Frameworks Eden.app/Contents/MacOS/Eden
 
-    # Remove signing step - we'll handle this locally
-    # - name: Sign application
-    #   run: |
-    #     cd eden-source/build/bin
-    #     codesign --force --deep --sign - --timestamp --options=runtime Eden.app
+    - name: Sign application
+      run: |
+        cd eden-source/build/bin
+        
+        # Create temporary keychain for signing
+        security create-keychain -p actions build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p actions build.keychain
+        security set-keychain-settings -u build.keychain
+        
+        # Sign all frameworks and libraries first
+        find Eden.app/Contents/Frameworks -type f -name "*.dylib" -exec codesign --force --sign - --timestamp --options=runtime {} \;
+        find Eden.app/Contents/Frameworks -type d -name "*.framework" -exec codesign --force --sign - --timestamp --options=runtime {} \;
+        
+        # Sign the main executable
+        codesign --force --sign - --timestamp --options=runtime Eden.app/Contents/MacOS/Eden
+        
+        # Finally sign the entire app bundle
+        codesign --force --deep --sign - --timestamp --options=runtime Eden.app
 
     - name: Create DMG
       run: |
