@@ -9,9 +9,6 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-    env:
-      PROJECT_DIR: ${{ github.workspace }}/eden-source
-      CMAKE_PREFIX_PATH: /opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake
 
     steps:
     - name: Checkout repository with submodules
@@ -19,6 +16,12 @@ jobs:
       with:
         submodules: 'recursive'
         path: eden-source
+
+    # Additional step to initialize nested submodules
+    - name: Initialize Eden submodules
+      run: |
+        cd eden-source
+        git submodule update --init --recursive
 
     - name: Install dependencies
       run: |
@@ -29,7 +32,7 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cd $PROJECT_DIR
+        cd eden-source
         cmake -B build \
           -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
           -DCMAKE_BUILD_TYPE=Release \
@@ -43,16 +46,16 @@ jobs:
 
     - name: Build Eden
       run: |
-        cd $PROJECT_DIR
+        cd eden-source
         cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
 
     - name: Package application
       run: |
         mkdir -p ${{ github.workspace }}/artifact
-        cp -R $PROJECT_DIR/build/bin/Eden.app ${{ github.workspace }}/artifact/
+        cp -R eden-source/build/bin/Eden.app ${{ github.workspace }}/artifact/
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4  # Updated from v3 to v4
+      uses: actions/upload-artifact@v4
       with:
         name: Eden-macOS
         path: ${{ github.workspace }}/artifact
