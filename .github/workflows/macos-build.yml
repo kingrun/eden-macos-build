@@ -86,22 +86,35 @@ jobs:
       run: |
         cd eden-source/build/bin
         
+        # Fix RPATH issues before running macdeployqt
+        install_name_tool -add_rpath @executable_path/../Frameworks Eden.app/Contents/MacOS/Eden
+        
         # Run macdeployqt with supported options
         /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
         
         # Add required libraries
         mkdir -p Eden.app/Contents/Frameworks
-        cp /opt/homebrew/lib/libvulkan.1.dylib Eden.app/Contents/Frameworks/
-        cp /opt/homebrew/lib/libMoltenVK.dylib Eden.app/Contents/Frameworks/
-        cp /opt/homebrew/lib/libcubeb.1.dylib Eden.app/Contents/Frameworks/
         
-        # Fix library paths
-        install_name_tool -id @rpath/libvulkan.1.dylib Eden.app/Contents/Frameworks/libvulkan.1.dylib
-        install_name_tool -id @rpath/libMoltenVK.dylib Eden.app/Contents/Frameworks/libMoltenVK.dylib
-        install_name_tool -id @rpath/libcubeb.1.dylib Eden.app/Contents/Frameworks/libcubeb.1.dylib
+        # Find actual Vulkan library path
+        VULKAN_LIB=$(find /opt/homebrew/lib -name 'libvulkan.*.dylib' -print -quit)
+        if [ -n "$VULKAN_LIB" ]; then
+          cp "$VULKAN_LIB" Eden.app/Contents/Frameworks/
+          install_name_tool -id @rpath/$(basename "$VULKAN_LIB") Eden.app/Contents/Frameworks/$(basename "$VULKAN_LIB")
+        fi
         
-        # Update executable to use RPATH
-        install_name_tool -add_rpath @executable_path/../Frameworks Eden.app/Contents/MacOS/Eden
+        # Find actual MoltenVK library path
+        MOLTENVK_LIB=$(find /opt/homebrew/lib -name 'libMoltenVK.dylib' -print -quit)
+        if [ -n "$MOLTENVK_LIB" ]; then
+          cp "$MOLTENVK_LIB" Eden.app/Contents/Frameworks/
+          install_name_tool -id @rpath/$(basename "$MOLTENVK_LIB") Eden.app/Contents/Frameworks/$(basename "$MOLTENVK_LIB")
+        fi
+        
+        # Find actual cubeb library path
+        CUBEB_LIB=$(find /opt/homebrew/lib -name 'libcubeb.*.dylib' -print -quit)
+        if [ -n "$CUBEB_LIB" ]; then
+          cp "$CUBEB_LIB" Eden.app/Contents/Frameworks/
+          install_name_tool -id @rpath/$(basename "$CUBEB_LIB") Eden.app/Contents/Frameworks/$(basename "$CUBEB_LIB")
+        fi
 
     - name: Sign application
       run: |
