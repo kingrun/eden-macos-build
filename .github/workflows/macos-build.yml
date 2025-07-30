@@ -22,7 +22,7 @@ jobs:
       run: |
         brew update
         # Core dependencies
-        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb catch2 cpp-httplib molten-vk vulkan-loader
+        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb catch2 cpp-httplib molten-vk vulkan-loader boost
         brew link --overwrite qt
         
         # Install STB headers manually
@@ -37,6 +37,7 @@ jobs:
         
         # Set environment variables
         echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake:/opt/homebrew" >> $GITHUB_ENV
+        echo "BOOST_ROOT=/opt/homebrew" >> $GITHUB_ENV
         echo "STB_INCLUDE_DIR=${{ github.workspace }}/stb/include" >> $GITHUB_ENV
         echo "VulkanMemoryAllocator_INCLUDE_DIR=${{ github.workspace }}/vma/include" >> $GITHUB_ENV
 
@@ -45,6 +46,7 @@ jobs:
         cd eden-source
         cmake -B build \
           -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+          -DBOOST_ROOT="$BOOST_ROOT" \
           -DCMAKE_BUILD_TYPE=Release \
           -DUSE_SYSTEM_FMT=ON \
           -DUSE_SYSTEM_ENET=ON \
@@ -56,7 +58,8 @@ jobs:
           -DSTB_INCLUDE_DIR="$STB_INCLUDE_DIR" \
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
-          -DEDEN_BUILD_TESTS=OFF
+          -DEDEN_BUILD_TESTS=OFF \
+          -DCMAKE_FIND_FRAMEWORK=LAST
 
     - name: Build Eden
       run: |
