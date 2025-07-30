@@ -28,17 +28,17 @@ jobs:
         brew update
         # Core dependencies
         brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb catch2 cpp-httplib molten-vk vulkan-loader boost
-        # Build tools for FFmpeg
+        # Build tools
         brew install autoconf automake libtool pkg-config
         brew link --overwrite qt
         
-        # Install STB headers manually
+        # Install STB headers
         mkdir -p ${{ github.workspace }}/stb/include
         curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image.h -o ${{ github.workspace }}/stb/include/stb_image.h
         curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image_resize.h -o ${{ github.workspace }}/stb/include/stb_image_resize.h
         curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h -o ${{ github.workspace }}/stb/include/stb_image_write.h
         
-        # Install Vulkan Memory Allocator manually
+        # Install Vulkan Memory Allocator
         mkdir -p ${{ github.workspace }}/vma/include
         curl -L https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/master/include/vk_mem_alloc.h -o ${{ github.workspace }}/vma/include/vk_mem_alloc.h
         
@@ -73,10 +73,80 @@ jobs:
         cd eden-source
         cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
 
-    - name: Package application
+    # Bundle dependencies and create proper app structure
+    - name: Prepare application bundle
       run: |
+        cd eden-source/build/bin
+        
+        # Create proper app structure
+        mkdir -p Eden.app/Contents/MacOS
+        mkdir -p Eden.app/Contents/Resources
+        mkdir -p Eden.app/Contents/Frameworks
+        
+        # Move executable to correct location
+        mv Eden Eden.app/Contents/MacOS/
+        
+        # Create Info.plist
+        cat > Eden.app/Contents/Info.plist <<EOL
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>Eden</string>
+            <key>CFBundleIdentifier</key>
+            <string>dev.eden-emu.Eden</string>
+            <key>CFBundleName</key>
+            <string>Eden</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+            <key>NSSupportsAutomaticGraphicsSwitching</key>
+            <true/>
+        </dict>
+        </plist>
+        EOL
+
+    # Bundle Qt frameworks
+    - name: Deploy Qt frameworks
+      run: |
+        cd eden-source/build/bin
+        /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
+        
+        # Fix library paths
+        find Eden.app -name "*.dylib" -exec echo "Fixing {}" \; -exec install_name_tool -delete_rpath /opt/homebrew/lib {} \;
+
+    # Sign the app properly
+    - name: Sign application
+      run: |
+        cd eden-source/build/bin
+        codesign --force --deep --sign - --timestamp --options=runtime Eden.app
+
+    # Create DMG with proper structure
+    - name: Create DMG
+      run: |
+        brew install create-dmg
         mkdir -p ${{ github.workspace }}/artifact
-        cp -R eden-source/build/bin/Eden.app ${{ github.workspace }}/artifact/
+        
+        cd eden-source/build/bin
+        create-dmg \
+          --volname "Eden Emulator" \
+          --volicon "${{ github.workspace }}/eden-source/distribution/macosx/eden.icns" \
+          --background "${{ github.workspace }}/eden-source/distribution/macosx/background.png" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --icon "Eden.app" 200 190 \
+          --app-drop-link 600 185 \
+          "${{ github.workspace }}/artifact/Eden.dmg" \
+          "Eden.app"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
