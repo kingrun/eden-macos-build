@@ -1,75 +1,58 @@
-name: Build Eden macOS
+name: Build Eden for macOS
+
 on:
   push:
-    branches: [macos]
+    branches: [ "macos" ]
   pull_request:
-    branches: [macos]
+    branches: [ "macos" ]
+
 jobs:
   build:
     runs-on: macos-latest
+
+    env:
+      PROJECT_DIR: ${{ github.workspace }}/eden-source
+      CMAKE_PREFIX_PATH: /opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake
+      nlohmann_json_DIR: /opt/homebrew/opt/nlohmann-json/share/cmake/nlohmann_json
+
     steps:
-      - name: Clone Eden with submodules
-        run: |
-          git clone --recursive https://git.eden-emu.dev/eden-emu/eden eden-source
-          cd eden-source
-          git submodule update --init --recursive --depth=1
-          rm -rf externals/nx_tzdb
-          echo "PROJECT_DIR=$(pwd)" >> $GITHUB_ENV
+    - name: Checkout repository with submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
 
-      - name: Install Build Dependencies
-        run: |
-          brew update
-          brew install cmake qt@6 glew sdl2 libpng libzip ffmpeg pkgconfig
-          brew install nlohmann-json cereal
-          brew install enet openal-soft cubeb
-          brew install vulkan-headers spirv-tools boost
-          brew install fmt lz4 zstd
-          brew install catch2 libusb
-          brew install autoconf automake libtool nasm
-          brew link qt@6 --force
+    - name: Install dependencies
+      run: |
+        brew update
+        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb
+        brew link --overwrite qt
 
-      - name: Setup Build Environment
-        run: |
-          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@6)/lib/cmake:$(brew --prefix)/lib/cmake" >> $GITHUB_ENV
-          echo "PATH=$(brew --prefix qt@6)/bin:$(brew --prefix autoconf)/bin:$(brew --prefix automake)/bin:$(brew --prefix libtool)/bin:$PATH" >> $GITHUB_ENV
-          echo "nlohmann_json_DIR=$(brew --prefix nlohmann-json)/share/cmake/nlohmann_json" >> $GITHUB_ENV
+    - name: Configure CMake
+      run: |
+        cd $PROJECT_DIR
+        cmake -B build \
+          -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DUSE_SYSTEM_FMT=ON \
+          -DUSE_SYSTEM_ENET=ON \
+          -DUSE_SYSTEM_CUBEB=ON \
+          -DUSE_SYSTEM_NLOHMANN_JSON=ON \
+          -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
+          -DENABLE_TZDB=OFF \
+          -DEDEN_FFMPEG_BUILD_TYPE=Release
 
-      - name: Patch CMakeLists to fix submodule checks
-        run: |
-          cd $PROJECT_DIR
-          # Backup original CMakeLists
-          cp CMakeLists.txt CMakeLists.txt.bak
-          
-          # Disable the entire submodule check block
-          perl -i -pe 'BEGIN{undef $/;} s/function\(check_submodules_present\).*?endfunction\(\)/## SUBMODULE CHECK DISABLED FOR MACOS BUILD ##/smg' CMakeLists.txt
-          perl -i -pe 's/check_submodules_present\(\)/## SUBMODULE CHECK DISABLED ##/' CMakeLists.txt
+    - name: Build Eden
+      run: |
+        cd $PROJECT_DIR
+        cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
 
-      - name: Configure Build
-        run: |
-          cd $PROJECT_DIR
-          cmake -B build \
-            -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DUSE_SYSTEM_FMT=ON \
-            -DUSE_SYSTEM_ENET=ON \
-            -DUSE_SYSTEM_CUBEB=ON \
-            -DUSE_SYSTEM_NLOHMANN_JSON=ON \
-            -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
-            -DENABLE_TZDB=OFF \
-            -DEDEN_FFMPEG_BUILD_TYPE=Release
+    - name: Package application
+      run: |
+        mkdir -p ${{ github.workspace }}/artifact
+        cp -R $PROJECT_DIR/build/bin/Eden.app ${{ github.workspace }}/artifact/
 
-      - name: Build Eden
-        run: |
-          cd $PROJECT_DIR
-          cmake --build build --config Release --parallel $(sysctl -n hw.ncpu)
-
-      - name: Package as DMG
-        run: |
-          cd $PROJECT_DIR/build
-          cpack -G DragNDrop
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Eden-macOS
-          path: $PROJECT_DIR/build/*.dmg
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Eden-macOS
+        path: ${{ github.workspace }}/artifact
