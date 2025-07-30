@@ -83,36 +83,36 @@ jobs:
         mkdir -p Eden.app/Contents/Resources
         mkdir -p Eden.app/Contents/Frameworks
         
-        # Move executable to correct location
-        mv Eden Eden.app/Contents/MacOS/
+        # Move executable to correct location (use 'yuzu' as executable name)
+        mv yuzu Eden.app/Contents/MacOS/Eden
         
         # Create Info.plist
         cat > Eden.app/Contents/Info.plist <<EOL
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>Eden</string>
-            <key>CFBundleIdentifier</key>
-            <string>dev.eden-emu.Eden</string>
-            <key>CFBundleName</key>
-            <string>Eden</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundleVersion</key>
-            <string>1</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-            <key>LSMinimumSystemVersion</key>
-            <string>11.0</string>
-            <key>NSSupportsAutomaticGraphicsSwitching</key>
-            <true/>
-        </dict>
-        </plist>
-        EOL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Eden</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.eden-emu.Eden</string>
+    <key>CFBundleName</key>
+    <string>Eden</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+</dict>
+</plist>
+EOL
 
     # Bundle Qt frameworks
     - name: Deploy Qt frameworks
