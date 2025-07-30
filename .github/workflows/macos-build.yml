@@ -79,33 +79,31 @@ jobs:
         # Move executable to correct location
         mv yuzu Eden.app/Contents/MacOS/Eden
         
-        # Create Info.plist
-        cat > Eden.app/Contents/Info.plist << "EOF"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>Eden</string>
-    <key>CFBundleIdentifier</key>
-    <string>dev.eden-emu.Eden</string>
-    <key>CFBundleName</key>
-    <string>Eden</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>LSMinimumSystemVersion</key>
-    <string>11.0</string>
-    <key>NSSupportsAutomaticGraphicsSwitching</key>
-    <true/>
-</dict>
-</plist>
-EOF
+        # Create Info.plist using echo commands
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > Eden.app/Contents/Info.plist
+        echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> Eden.app/Contents/Info.plist
+        echo '<plist version="1.0">' >> Eden.app/Contents/Info.plist
+        echo '<dict>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleExecutable</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleIdentifier</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>dev.eden-emu.Eden</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleName</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundlePackageType</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>APPL</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleShortVersionString</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>1.0.0</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleVersion</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>1</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>NSHighResolutionCapable</key>' >> Eden.app/Contents/Info.plist
+        echo '    <true/>' >> Eden.app/Contents/Info.plist
+        echo '    <key>LSMinimumSystemVersion</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>11.0</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>NSSupportsAutomaticGraphicsSwitching</key>' >> Eden.app/Contents/Info.plist
+        echo '    <true/>' >> Eden.app/Contents/Info.plist
+        echo '</dict>' >> Eden.app/Contents/Info.plist
+        echo '</plist>' >> Eden.app/Contents/Info.plist
 
     - name: Deploy Qt frameworks
       run: |
@@ -123,10 +121,24 @@ EOF
         brew install create-dmg
         mkdir -p ${{ github.workspace }}/artifact
         cd eden-source/build/bin
+        
+        # Check if assets exist, use defaults if not
+        if [ -f "${{ github.workspace }}/eden-source/distribution/macosx/eden.icns" ]; then
+          VOLICON="--volicon ${{ github.workspace }}/eden-source/distribution/macosx/eden.icns"
+        else
+          VOLICON=""
+        fi
+        
+        if [ -f "${{ github.workspace }}/eden-source/distribution/macosx/background.png" ]; then
+          BACKGROUND="--background ${{ github.workspace }}/eden-source/distribution/macosx/background.png"
+        else
+          BACKGROUND=""
+        fi
+        
         create-dmg \
           --volname "Eden Emulator" \
-          --volicon "${{ github.workspace }}/eden-source/distribution/macosx/eden.icns" \
-          --background "${{ github.workspace }}/eden-source/distribution/macosx/background.png" \
+          $VOLICON \
+          $BACKGROUND \
           --window-pos 200 120 \
           --window-size 800 400 \
           --icon-size 100 \
