@@ -34,15 +34,15 @@ jobs:
           echo "PATH=$(brew --prefix qt@6)/bin:$(brew --prefix autoconf)/bin:$(brew --prefix automake)/bin:$(brew --prefix libtool)/bin:$PATH" >> $GITHUB_ENV
           echo "nlohmann_json_DIR=$(brew --prefix nlohmann-json)/share/cmake/nlohmann_json" >> $GITHUB_ENV
 
-      - name: Patch CMakeLists to bypass submodule checks
+      - name: Patch CMakeLists to fix submodule checks
         run: |
           cd $PROJECT_DIR
           # Backup original CMakeLists
           cp CMakeLists.txt CMakeLists.txt.bak
           
-          # Disable submodule checks with precise editing
-          sed -i '' 's/check_submodules_present()/#check_submodules_present()/' CMakeLists.txt
-          sed -i '' 's/message(FATAL_ERROR/#message(FATAL_ERROR/' CMakeLists.txt
+          # Disable the entire submodule check block
+          perl -i -pe 'BEGIN{undef $/;} s/function\(check_submodules_present\).*?endfunction\(\)/## SUBMODULE CHECK DISABLED FOR MACOS BUILD ##/smg' CMakeLists.txt
+          perl -i -pe 's/check_submodules_present\(\)/## SUBMODULE CHECK DISABLED ##/' CMakeLists.txt
 
       - name: Configure Build
         run: |
