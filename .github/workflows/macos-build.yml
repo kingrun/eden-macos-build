@@ -12,14 +12,8 @@ jobs:
         run: |
           git clone --recursive https://git.eden-emu.dev/eden-emu/eden eden-source
           cd eden-source
-          
-          # Initialize all submodules
           git submodule update --init --recursive --depth=1
-          
-          # Disable problem submodules
           rm -rf externals/nx_tzdb
-          rm -rf externals/cubeb
-          
           echo "PROJECT_DIR=$(pwd)" >> $GITHUB_ENV
 
       - name: Install Build Dependencies
@@ -46,9 +40,9 @@ jobs:
           # Backup original CMakeLists
           cp CMakeLists.txt CMakeLists.txt.bak
           
-          # Disable submodule checks
-          sed -i '' '/check_submodules_present()/d' CMakeLists.txt
-          sed -i '' '/message(FATAL_ERROR/d' CMakeLists.txt
+          # Disable submodule checks with precise editing
+          sed -i '' 's/check_submodules_present()/#check_submodules_present()/' CMakeLists.txt
+          sed -i '' 's/message(FATAL_ERROR/#message(FATAL_ERROR/' CMakeLists.txt
 
       - name: Configure Build
         run: |
