@@ -23,20 +23,17 @@ jobs:
         brew update
         # Core dependencies
         brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb
-        
-        # Additional dependencies found in the error log
-        brew install catch2 cpp-httplib vulkan-memory-allocator stb
-        brew install --HEAD oaknut
-        brew install dynarmic
-        
-        # Link Qt properly
+        # Additional dependencies
+        brew install catch2 cpp-httplib stb molten-vk vulkan-loader
         brew link --overwrite qt
+        
+        # Install Vulkan Memory Allocator manually
+        mkdir -p ${{ github.workspace }}/vma/include
+        curl -L https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/master/include/vk_mem_alloc.h -o ${{ github.workspace }}/vma/include/vk_mem_alloc.h
         
         # Set environment variables
         echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake:/opt/homebrew" >> $GITHUB_ENV
-        echo "Catch2_DIR=/opt/homebrew/lib/cmake/Catch2" >> $GITHUB_ENV
-        echo "oaknut_DIR=/opt/homebrew/share/oaknut/cmake" >> $GITHUB_ENV
-        echo "dynarmic_DIR=/opt/homebrew/share/dynarmic/cmake" >> $GITHUB_ENV
+        echo "VulkanMemoryAllocator_INCLUDE_DIR=${{ github.workspace }}/vma/include" >> $GITHUB_ENV
 
     - name: Configure CMake
       run: |
@@ -49,13 +46,8 @@ jobs:
           -DUSE_SYSTEM_CUBEB=ON \
           -DUSE_SYSTEM_NLOHMANN_JSON=ON \
           -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
-          -DUSE_SYSTEM_CATCH2=ON \
-          -DUSE_SYSTEM_STB=ON \
-          -DUSE_SYSTEM_CPP_JWT=ON \
-          -DUSE_SYSTEM_HTTPLIB=ON \
-          -DUSE_SYSTEM_OAKNUT=ON \
-          -DUSE_SYSTEM_DYNARMIC=ON \
-          -DUSE_SYSTEM_VULKAN_MEMORY_ALLOCATOR=ON \
+          -DUSE_SYSTEM_VULKAN_MEMORY_ALLOCATOR=OFF \
+          -DVulkanMemoryAllocator_INCLUDE_DIR="$VulkanMemoryAllocator_INCLUDE_DIR" \
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF
