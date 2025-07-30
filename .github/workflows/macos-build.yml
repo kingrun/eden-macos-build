@@ -11,17 +11,19 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout repository with submodules
+    - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: 'recursive'
         path: eden-source
 
-    # Additional step to initialize nested submodules
-    - name: Initialize Eden submodules
+    # Explicitly initialize cubeb and other critical submodules
+    - name: Initialize critical submodules
       run: |
         cd eden-source
-        git submodule update --init --recursive
+        git submodule update --init externals/cubeb
+        git submodule update --init --recursive externals/dynarmic
+        git submodule update --init --recursive externals/oaknut
 
     - name: Install dependencies
       run: |
