@@ -13,23 +13,30 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        path: eden-repo
 
     - name: Clone Eden source with submodules
       run: |
-        # Clone the actual Eden repository with all submodules
         git clone --recurse-submodules https://git.eden-emu.dev/eden-emu/eden.git eden-source
-        
-        # If you have custom changes in your fork, use this instead:
-        # git clone --recurse-submodules https://github.com/your-username/eden.git eden-source
 
     - name: Install dependencies
       run: |
         brew update
+        # Core dependencies
         brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb
+        
+        # Additional dependencies found in the error log
+        brew install catch2 cpp-httplib vulkan-memory-allocator stb
+        brew install --HEAD oaknut
+        brew install dynarmic
+        
+        # Link Qt properly
         brew link --overwrite qt
-        echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake" >> $GITHUB_ENV
+        
+        # Set environment variables
+        echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake:/opt/homebrew" >> $GITHUB_ENV
+        echo "Catch2_DIR=/opt/homebrew/lib/cmake/Catch2" >> $GITHUB_ENV
+        echo "oaknut_DIR=/opt/homebrew/share/oaknut/cmake" >> $GITHUB_ENV
+        echo "dynarmic_DIR=/opt/homebrew/share/dynarmic/cmake" >> $GITHUB_ENV
 
     - name: Configure CMake
       run: |
@@ -42,8 +49,16 @@ jobs:
           -DUSE_SYSTEM_CUBEB=ON \
           -DUSE_SYSTEM_NLOHMANN_JSON=ON \
           -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
+          -DUSE_SYSTEM_CATCH2=ON \
+          -DUSE_SYSTEM_STB=ON \
+          -DUSE_SYSTEM_CPP_JWT=ON \
+          -DUSE_SYSTEM_HTTPLIB=ON \
+          -DUSE_SYSTEM_OAKNUT=ON \
+          -DUSE_SYSTEM_DYNARMIC=ON \
+          -DUSE_SYSTEM_VULKAN_MEMORY_ALLOCATOR=ON \
           -DENABLE_TZDB=OFF \
-          -DEDEN_FFMPEG_BUILD_TYPE=Release
+          -DEDEN_FFMPEG_BUILD_TYPE=Release \
+          -DEDEN_BUILD_TESTS=OFF
 
     - name: Build Eden
       run: |
