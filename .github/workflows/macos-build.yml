@@ -41,7 +41,6 @@ jobs:
         echo "BOOST_ROOT=/opt/homebrew" >> $GITHUB_ENV
         echo "STB_INCLUDE_DIR=${{ github.workspace }}/stb/include" >> $GITHUB_ENV
         echo "VulkanMemoryAllocator_INCLUDE_DIR=${{ github.workspace }}/vma/include" >> $GITHUB_ENV
-        echo "Catch2_DIR=/opt/homebrew/lib/cmake/Catch2" >> $GITHUB_ENV
 
     - name: Configure CMake
       run: |
@@ -62,53 +61,32 @@ jobs:
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF \
           -DCMAKE_FIND_FRAMEWORK=LAST \
-          -DCatch2_DIR="$Catch2_DIR" \
-          -Dstb_image_INCLUDE_DIR="$STB_INCLUDE_DIR" \
-          -Dstb_image_resize_INCLUDE_DIR="$STB_INCLUDE_DIR" \
-          -Dstb_image_write_INCLUDE_DIR="$STB_INCLUDE_DIR" \
-          -DCPP_HTTPLIB_INCLUDE_DIR=/opt/homebrew/include \
-          -DUSE_SYSTEM_CPP_HTTPLIB=ON
+          -DCMAKE_CXX_FLAGS="-O1"  # Reduced optimization for dynarmic
 
     - name: Build Eden
       run: |
         cd eden-source
-        cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
-
+        # Build with reduced parallelism to avoid memory issues
+        cmake --build build --config Release --parallel 2
+        
     - name: Rename application bundle
       run: |
         cd eden-source/build/bin
-        # Rename main application bundle
         mv eden.app Eden.app
-        
-        # Rename executable inside bundle
         mv Eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
 
     - name: Update Info.plist
       run: |
         cd eden-source/build/bin
-        # Update executable name in Info.plist
         plutil -replace CFBundleExecutable -string "Eden" Eden.app/Contents/Info.plist
-        # Ensure bundle identifier is correct
         plutil -replace CFBundleIdentifier -string "dev.eden-emu.Eden" Eden.app/Contents/Info.plist
-        # Set minimum OS version
         plutil -replace LSMinimumSystemVersion -string "11.0" Eden.app/Contents/Info.plist
 
     - name: Deploy Qt frameworks
       run: |
         cd eden-source/build/bin
         /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
-        # Clean up unnecessary rpaths
         find Eden.app -name "*.dylib" -exec install_name_tool -delete_rpath /opt/homebrew/lib {} \;
-
-    - name: Sign application
-      run: |
-        cd eden-source/build/bin
-        # Create temporary certificate for ad-hoc signing
-        security create-keychain -p actions build.keychain
-        security default-keychain -s build.keychain
-        security unlock-keychain -p actions build.keychain
-        # Required for notarization compatibility
-        codesign --force --deep --sign - --timestamp --options=runtime Eden.app
 
     - name: Create DMG
       run: |
@@ -116,7 +94,6 @@ jobs:
         mkdir -p ${{ github.workspace }}/artifact
         cd eden-source/build/bin
         
-        # Use bundled assets if available
         VOLICON=""
         BACKGROUND=""
         
