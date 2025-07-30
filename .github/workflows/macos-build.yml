@@ -25,8 +25,12 @@ jobs:
     - name: Install dependencies
       run: |
         brew update
-        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb molten-vk vulkan-loader boost
+        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb catch2 cpp-httplib molten-vk vulkan-loader boost
         brew link --overwrite qt
+        
+        # Install additional required dependencies
+        brew install pkg-config libusb
+        brew install --cask vulkan-sdk
         
         mkdir -p ${{ github.workspace }}/stb/include
         curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image.h -o ${{ github.workspace }}/stb/include/stb_image.h
@@ -36,10 +40,12 @@ jobs:
         mkdir -p ${{ github.workspace }}/vma/include
         curl -L https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/master/include/vk_mem_alloc.h -o ${{ github.workspace }}/vma/include/vk_mem_alloc.h
         
+        # Set up environment variables
         echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake:/opt/homebrew" >> $GITHUB_ENV
         echo "BOOST_ROOT=/opt/homebrew" >> $GITHUB_ENV
         echo "STB_INCLUDE_DIR=${{ github.workspace }}/stb/include" >> $GITHUB_ENV
         echo "VulkanMemoryAllocator_INCLUDE_DIR=${{ github.workspace }}/vma/include" >> $GITHUB_ENV
+        echo "Catch2_DIR=/opt/homebrew/lib/cmake/Catch2" >> $GITHUB_ENV
 
     - name: Configure CMake
       run: |
@@ -59,14 +65,19 @@ jobs:
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF \
-          -DCMAKE_FIND_FRAMEWORK=LAST
+          -DCMAKE_FIND_FRAMEWORK=LAST \
+          -DCatch2_DIR="$Catch2_DIR" \
+          -Dstb_image_INCLUDE_DIR="$STB_INCLUDE_DIR" \
+          -Dstb_image_resize_INCLUDE_DIR="$STB_INCLUDE_DIR" \
+          -Dstb_image_write_INCLUDE_DIR="$STB_INCLUDE_DIR" \
+          -DCPP_HTTPLIB_INCLUDE_DIR=/opt/homebrew/include \
+          -DUSE_SYSTEM_CPP_HTTPLIB=ON
 
     - name: Build Eden
       run: |
         cd eden-source
         cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
 
-    # Fixed section starts here
     - name: Rename application bundle
       run: |
         cd eden-source/build/bin
