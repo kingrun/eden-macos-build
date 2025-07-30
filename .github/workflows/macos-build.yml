@@ -60,15 +60,13 @@ jobs:
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF \
-          -DCMAKE_FIND_FRAMEWORK=LAST \
-          -DCMAKE_CXX_FLAGS="-O1"  # Reduced optimization for dynarmic
+          -DCMAKE_FIND_FRAMEWORK=LAST
 
     - name: Build Eden
       run: |
         cd eden-source
-        # Build with reduced parallelism to avoid memory issues
-        cmake --build build --config Release --parallel 2
-        
+        cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
+
     - name: Rename application bundle
       run: |
         cd eden-source/build/bin
@@ -86,7 +84,17 @@ jobs:
       run: |
         cd eden-source/build/bin
         /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
-        find Eden.app -name "*.dylib" -exec install_name_tool -delete_rpath /opt/homebrew/lib {} \;
+        
+        # Add missing Vulkan framework
+        mkdir -p Eden.app/Contents/Frameworks
+        cp /opt/homebrew/lib/libvulkan.1.dylib Eden.app/Contents/Frameworks/
+        install_name_tool -id @rpath/libvulkan.1.dylib Eden.app/Contents/Frameworks/libvulkan.1.dylib
+
+    # Remove signing step - we'll handle this locally
+    # - name: Sign application
+    #   run: |
+    #     cd eden-source/build/bin
+    #     codesign --force --deep --sign - --timestamp --options=runtime Eden.app
 
     - name: Create DMG
       run: |
