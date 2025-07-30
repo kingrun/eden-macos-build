@@ -22,10 +22,14 @@ jobs:
       run: |
         brew update
         # Core dependencies
-        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb
-        # Additional dependencies
-        brew install catch2 cpp-httplib stb molten-vk vulkan-loader
+        brew install qt nlohmann-json fmt cmake ffmpeg glslang enet lz4 cubeb catch2 cpp-httplib molten-vk vulkan-loader
         brew link --overwrite qt
+        
+        # Install STB headers manually
+        mkdir -p ${{ github.workspace }}/stb/include
+        curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image.h -o ${{ github.workspace }}/stb/include/stb_image.h
+        curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image_resize.h -o ${{ github.workspace }}/stb/include/stb_image_resize.h
+        curl -L https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h -o ${{ github.workspace }}/stb/include/stb_image_write.h
         
         # Install Vulkan Memory Allocator manually
         mkdir -p ${{ github.workspace }}/vma/include
@@ -33,6 +37,7 @@ jobs:
         
         # Set environment variables
         echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt/lib/cmake:/opt/homebrew/lib/cmake:/opt/homebrew" >> $GITHUB_ENV
+        echo "STB_INCLUDE_DIR=${{ github.workspace }}/stb/include" >> $GITHUB_ENV
         echo "VulkanMemoryAllocator_INCLUDE_DIR=${{ github.workspace }}/vma/include" >> $GITHUB_ENV
 
     - name: Configure CMake
@@ -48,6 +53,7 @@ jobs:
           -DUSE_SYSTEM_SPIRV_HEADERS=OFF \
           -DUSE_SYSTEM_VULKAN_MEMORY_ALLOCATOR=OFF \
           -DVulkanMemoryAllocator_INCLUDE_DIR="$VulkanMemoryAllocator_INCLUDE_DIR" \
+          -DSTB_INCLUDE_DIR="$STB_INCLUDE_DIR" \
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF
