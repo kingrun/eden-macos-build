@@ -18,6 +18,11 @@ jobs:
       run: |
         git clone --recurse-submodules https://git.eden-emu.dev/eden-emu/eden.git eden-source
 
+    - name: Apply compilation fix
+      run: |
+        # Fix the Offset3D constructor issue
+        sed -i '' 's/VideoCommon::Offset3D(0, 0, 0)/{0, 0, 0}/g' eden-source/src/video_core/renderer_vulkan/vk_texture_cache.cpp
+
     - name: Install dependencies
       run: |
         brew update
