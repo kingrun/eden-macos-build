@@ -14,16 +14,15 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        submodules: 'recursive'
-        path: eden-source
+        path: eden-repo
 
-    # Explicitly initialize cubeb and other critical submodules
-    - name: Initialize critical submodules
+    - name: Clone Eden source with submodules
       run: |
-        cd eden-source
-        git submodule update --init externals/cubeb
-        git submodule update --init --recursive externals/dynarmic
-        git submodule update --init --recursive externals/oaknut
+        # Clone the actual Eden repository with all submodules
+        git clone --recurse-submodules https://git.eden-emu.dev/eden-emu/eden.git eden-source
+        
+        # If you have custom changes in your fork, use this instead:
+        # git clone --recurse-submodules https://github.com/your-username/eden.git eden-source
 
     - name: Install dependencies
       run: |
