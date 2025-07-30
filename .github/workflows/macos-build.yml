@@ -86,8 +86,8 @@ jobs:
       run: |
         cd eden-source/build/bin
         
-        # First run macdeployqt without signing
-        /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite -no-strip -no-plugins -no-codesign
+        # Run macdeployqt with supported options
+        /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
         
         # Add required libraries
         mkdir -p Eden.app/Contents/Frameworks
