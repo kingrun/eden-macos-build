@@ -8,27 +8,22 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Clone official Eden with submodules
+      - name: Clone Eden with submodules
         run: |
+          # Clone directly from source with full history
           git clone --recursive https://git.eden-emu.dev/eden-emu/eden eden-source
-          echo "SOURCE_DIR=$(pwd)/eden-source" >> $GITHUB_ENV
-          echo "PROJECT_DIR=$(pwd)/eden-build" >> $GITHUB_ENV
-
-      - name: Create clean build directory
-        run: |
-          mkdir eden-build
-          # Copy only needed files, excluding problematic submodules
-          rsync -av --exclude='.git' --exclude='externals/nx_tzdb' eden-source/ eden-build/
-          mkdir -p eden-build/.github/workflows
-          cp eden-source/.github/workflows/* eden-build/.github/workflows/ || true
-
-      - name: Patch CMakeLists to skip tzdb check
-        run: |
-          cd $PROJECT_DIR
-          # Backup original CMakeLists.txt
-          cp CMakeLists.txt CMakeLists.txt.bak
-          # Remove the submodule check for nx_tzdb
-          sed -i '' '/externals\/nx_tzdb\/tzdb_to_nx\/externals\/tz\/tz/d' CMakeLists.txt
+          cd eden-source
+          
+          # Checkout specific commit if needed (optional)
+          # git checkout <commit-hash>
+          
+          # Initialize all submodules
+          git submodule update --init --recursive --depth=1
+          
+          # Remove problematic tzdb module
+          rm -rf externals/nx_tzdb
+          
+          echo "PROJECT_DIR=$(pwd)" >> $GITHUB_ENV
 
       - name: Install Build Dependencies
         run: |
