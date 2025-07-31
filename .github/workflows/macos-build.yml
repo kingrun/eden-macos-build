@@ -79,55 +79,54 @@ jobs:
       run: |
         cd eden-source/build/bin
         
-        # Find the correct executable name
-        if [ -f "eden" ]; then
-          EXECUTABLE="eden"
-        elif [ -f "yuzu" ]; then
-          EXECUTABLE="yuzu"
-        elif [ -f "Eden" ]; then
-          EXECUTABLE="Eden"
+        # Check if the app bundle already exists with the executable
+        if [ -f "eden.app/Contents/MacOS/eden" ]; then
+          echo "Found existing app bundle with executable"
+          # Rename the existing app bundle to Eden.app
+          if [ -d "Eden.app" ]; then
+            rm -rf Eden.app
+          fi
+          mv eden.app Eden.app
+          # Rename the executable inside to Eden
+          mv Eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
         else
-          echo "Error: Could not find Eden executable"
+          echo "Error: Could not find eden.app bundle"
           echo "Available files:"
           ls -la
           exit 1
         fi
         
-        echo "Found executable: $EXECUTABLE"
-        
-        # Create proper app structure
-        mkdir -p Eden.app/Contents/MacOS
+        # Ensure proper app structure exists
         mkdir -p Eden.app/Contents/Resources
         mkdir -p Eden.app/Contents/Frameworks
         
-        # Move executable to correct location
-        mv "$EXECUTABLE" Eden.app/Contents/MacOS/Eden
-        
-        # Create Info.plist using echo commands
-        echo '<?xml version="1.0" encoding="UTF-8"?>' > Eden.app/Contents/Info.plist
-        echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> Eden.app/Contents/Info.plist
-        echo '<plist version="1.0">' >> Eden.app/Contents/Info.plist
-        echo '<dict>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleExecutable</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleIdentifier</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>dev.eden-emu.Eden</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleName</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundlePackageType</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>APPL</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleShortVersionString</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>1.0.0</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>CFBundleVersion</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>1</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>NSHighResolutionCapable</key>' >> Eden.app/Contents/Info.plist
-        echo '    <true/>' >> Eden.app/Contents/Info.plist
-        echo '    <key>LSMinimumSystemVersion</key>' >> Eden.app/Contents/Info.plist
-        echo '    <string>11.0</string>' >> Eden.app/Contents/Info.plist
-        echo '    <key>NSSupportsAutomaticGraphicsSwitching</key>' >> Eden.app/Contents/Info.plist
-        echo '    <true/>' >> Eden.app/Contents/Info.plist
-        echo '</dict>' >> Eden.app/Contents/Info.plist
-        echo '</plist>' >> Eden.app/Contents/Info.plist
+        # Create or update Info.plist
+        cat > Eden.app/Contents/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Eden</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.eden-emu.Eden</string>
+    <key>CFBundleName</key>
+    <string>Eden</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+</dict>
+</plist>
+EOF
 
     - name: Deploy Qt frameworks
       run: |
