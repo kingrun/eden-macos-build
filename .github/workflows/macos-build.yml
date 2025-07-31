@@ -83,6 +83,11 @@ jobs:
         if [ -f "eden.app/Contents/MacOS/eden" ]; then
           echo "Found existing app bundle with executable"
           
+          # Remove any existing Eden.app to avoid conflicts
+          if [ -d "Eden.app" ]; then
+            rm -rf Eden.app
+          fi
+          
           # Create Eden.app structure
           mkdir -p Eden.app/Contents/MacOS
           mkdir -p Eden.app/Contents/Resources
@@ -90,13 +95,14 @@ jobs:
           
           # Copy the executable and rename it
           cp eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
+          chmod +x Eden.app/Contents/MacOS/Eden
           
           # Copy any other contents from eden.app if they exist
-          if [ -d "eden.app/Contents/Resources" ]; then
-            cp -r eden.app/Contents/Resources/* Eden.app/Contents/Resources/ 2>/dev/null || true
+          if [ -d "eden.app/Contents/Resources" ] && [ "$(ls -A eden.app/Contents/Resources 2>/dev/null)" ]; then
+            cp -r eden.app/Contents/Resources/* Eden.app/Contents/Resources/
           fi
-          if [ -d "eden.app/Contents/Frameworks" ]; then
-            cp -r eden.app/Contents/Frameworks/* Eden.app/Contents/Frameworks/ 2>/dev/null || true
+          if [ -d "eden.app/Contents/Frameworks" ] && [ "$(ls -A eden.app/Contents/Frameworks 2>/dev/null)" ]; then
+            cp -r eden.app/Contents/Frameworks/* Eden.app/Contents/Frameworks/
           fi
           
           # Verify the executable was copied successfully
