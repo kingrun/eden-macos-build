@@ -60,80 +60,84 @@ jobs:
           -DENABLE_TZDB=OFF \
           -DEDEN_FFMPEG_BUILD_TYPE=Release \
           -DEDEN_BUILD_TESTS=OFF \
-          -DCMAKE_FIND_FRAMEWORK=LAST \
-          -DCMAKE_MACOSX_RPATH=ON
+          -DCMAKE_FIND_FRAMEWORK=LAST
 
     - name: Build Eden
       run: |
         cd eden-source
         cmake --build build --config Release --parallel $(sysctl -n hw.logicalcpu)
 
-    - name: Rename application bundle
+    - name: Debug - List built files
       run: |
         cd eden-source/build/bin
-        mv eden.app Eden.app
-        mv Eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
+        echo "Contents of build/bin directory:"
+        ls -la
+        echo "Looking for executables:"
+        find . -type f -perm +111 -name "*eden*" -o -name "*yuzu*" -o -name "*Eden*"
 
-    - name: Update Info.plist
+    - name: Prepare application bundle
       run: |
         cd eden-source/build/bin
-        plutil -replace CFBundleExecutable -string "Eden" Eden.app/Contents/Info.plist
-        plutil -replace CFBundleIdentifier -string "dev.eden-emu.Eden" Eden.app/Contents/Info.plist
-        plutil -replace LSMinimumSystemVersion -string "11.0" Eden.app/Contents/Info.plist
-        plutil -replace NSPrincipalClass -string NSApplication Eden.app/Contents/Info.plist
+        
+        # Find the correct executable name
+        if [ -f "eden" ]; then
+          EXECUTABLE="eden"
+        elif [ -f "yuzu" ]; then
+          EXECUTABLE="yuzu"
+        elif [ -f "Eden" ]; then
+          EXECUTABLE="Eden"
+        else
+          echo "Error: Could not find Eden executable"
+          echo "Available files:"
+          ls -la
+          exit 1
+        fi
+        
+        echo "Found executable: $EXECUTABLE"
+        
+        # Create proper app structure
+        mkdir -p Eden.app/Contents/MacOS
+        mkdir -p Eden.app/Contents/Resources
+        mkdir -p Eden.app/Contents/Frameworks
+        
+        # Move executable to correct location
+        mv "$EXECUTABLE" Eden.app/Contents/MacOS/Eden
+        
+        # Create Info.plist using echo commands
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > Eden.app/Contents/Info.plist
+        echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> Eden.app/Contents/Info.plist
+        echo '<plist version="1.0">' >> Eden.app/Contents/Info.plist
+        echo '<dict>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleExecutable</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleIdentifier</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>dev.eden-emu.Eden</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleName</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>Eden</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundlePackageType</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>APPL</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleShortVersionString</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>1.0.0</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>CFBundleVersion</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>1</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>NSHighResolutionCapable</key>' >> Eden.app/Contents/Info.plist
+        echo '    <true/>' >> Eden.app/Contents/Info.plist
+        echo '    <key>LSMinimumSystemVersion</key>' >> Eden.app/Contents/Info.plist
+        echo '    <string>11.0</string>' >> Eden.app/Contents/Info.plist
+        echo '    <key>NSSupportsAutomaticGraphicsSwitching</key>' >> Eden.app/Contents/Info.plist
+        echo '    <true/>' >> Eden.app/Contents/Info.plist
+        echo '</dict>' >> Eden.app/Contents/Info.plist
+        echo '</plist>' >> Eden.app/Contents/Info.plist
 
     - name: Deploy Qt frameworks
       run: |
         cd eden-source/build/bin
-        
-        # Fix RPATH issues before running macdeployqt
-        install_name_tool -add_rpath @executable_path/../Frameworks Eden.app/Contents/MacOS/Eden
-        
-        # Run macdeployqt with supported options
         /opt/homebrew/bin/macdeployqt Eden.app -verbose=1 -always-overwrite
-        
-        # Add required libraries
-        mkdir -p Eden.app/Contents/Frameworks
-        
-        # Find actual Vulkan library path
-        VULKAN_LIB=$(find /opt/homebrew/lib -name 'libvulkan.*.dylib' -print -quit)
-        if [ -n "$VULKAN_LIB" ]; then
-          cp "$VULKAN_LIB" Eden.app/Contents/Frameworks/
-          install_name_tool -id @rpath/$(basename "$VULKAN_LIB") Eden.app/Contents/Frameworks/$(basename "$VULKAN_LIB")
-        fi
-        
-        # Find actual MoltenVK library path
-        MOLTENVK_LIB=$(find /opt/homebrew/lib -name 'libMoltenVK.dylib' -print -quit)
-        if [ -n "$MOLTENVK_LIB" ]; then
-          cp "$MOLTENVK_LIB" Eden.app/Contents/Frameworks/
-          install_name_tool -id @rpath/$(basename "$MOLTENVK_LIB") Eden.app/Contents/Frameworks/$(basename "$MOLTENVK_LIB")
-        fi
-        
-        # Find actual cubeb library path
-        CUBEB_LIB=$(find /opt/homebrew/lib -name 'libcubeb.*.dylib' -print -quit)
-        if [ -n "$CUBEB_LIB" ]; then
-          cp "$CUBEB_LIB" Eden.app/Contents/Frameworks/
-          install_name_tool -id @rpath/$(basename "$CUBEB_LIB") Eden.app/Contents/Frameworks/$(basename "$CUBEB_LIB")
-        fi
+        find Eden.app -name "*.dylib" -exec install_name_tool -delete_rpath /opt/homebrew/lib {} \;
 
     - name: Sign application
       run: |
         cd eden-source/build/bin
-        
-        # Create temporary keychain for signing
-        security create-keychain -p actions build.keychain
-        security default-keychain -s build.keychain
-        security unlock-keychain -p actions build.keychain
-        security set-keychain-settings -u build.keychain
-        
-        # Sign all frameworks and libraries first
-        find Eden.app/Contents/Frameworks -type f -name "*.dylib" -exec codesign --force --sign - --timestamp --options=runtime {} \;
-        find Eden.app/Contents/Frameworks -type d -name "*.framework" -exec codesign --force --sign - --timestamp --options=runtime {} \;
-        
-        # Sign the main executable
-        codesign --force --sign - --timestamp --options=runtime Eden.app/Contents/MacOS/Eden
-        
-        # Finally sign the entire app bundle
         codesign --force --deep --sign - --timestamp --options=runtime Eden.app
 
     - name: Create DMG
@@ -142,15 +146,17 @@ jobs:
         mkdir -p ${{ github.workspace }}/artifact
         cd eden-source/build/bin
         
-        VOLICON=""
-        BACKGROUND=""
-        
+        # Check if assets exist, use defaults if not
         if [ -f "${{ github.workspace }}/eden-source/distribution/macosx/eden.icns" ]; then
           VOLICON="--volicon ${{ github.workspace }}/eden-source/distribution/macosx/eden.icns"
+        else
+          VOLICON=""
         fi
         
         if [ -f "${{ github.workspace }}/eden-source/distribution/macosx/background.png" ]; then
           BACKGROUND="--background ${{ github.workspace }}/eden-source/distribution/macosx/background.png"
+        else
+          BACKGROUND=""
         fi
         
         create-dmg \
