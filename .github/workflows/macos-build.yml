@@ -82,23 +82,38 @@ jobs:
         # Check if the app bundle already exists with the executable
         if [ -f "eden.app/Contents/MacOS/eden" ]; then
           echo "Found existing app bundle with executable"
-          # Rename the existing app bundle to Eden.app
-          if [ -d "Eden.app" ]; then
-            rm -rf Eden.app
+          
+          # Create Eden.app structure
+          mkdir -p Eden.app/Contents/MacOS
+          mkdir -p Eden.app/Contents/Resources
+          mkdir -p Eden.app/Contents/Frameworks
+          
+          # Copy the executable and rename it
+          cp eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
+          
+          # Copy any other contents from eden.app if they exist
+          if [ -d "eden.app/Contents/Resources" ]; then
+            cp -r eden.app/Contents/Resources/* Eden.app/Contents/Resources/ 2>/dev/null || true
           fi
-          mv eden.app Eden.app
-          # Rename the executable inside to Eden
-          mv Eden.app/Contents/MacOS/eden Eden.app/Contents/MacOS/Eden
+          if [ -d "eden.app/Contents/Frameworks" ]; then
+            cp -r eden.app/Contents/Frameworks/* Eden.app/Contents/Frameworks/ 2>/dev/null || true
+          fi
+          
+          # Verify the executable was copied successfully
+          if [ ! -f "Eden.app/Contents/MacOS/Eden" ]; then
+            echo "Error: Failed to copy executable"
+            exit 1
+          fi
+          
+          echo "Successfully created Eden.app bundle"
         else
           echo "Error: Could not find eden.app bundle"
           echo "Available files:"
           ls -la
+          echo "Contents of current directory:"
+          find . -name "*.app" -type d
           exit 1
         fi
-        
-        # Ensure proper app structure exists
-        mkdir -p Eden.app/Contents/Resources
-        mkdir -p Eden.app/Contents/Frameworks
         
         # Create or update Info.plist
         echo '<?xml version="1.0" encoding="UTF-8"?>' > Eden.app/Contents/Info.plist
